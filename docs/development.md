@@ -476,6 +476,7 @@ make lint-actions       Run actionlint
 make check-swift-toolchain Verify compiler, SDK, and Testing.framework compatibility
 make build              Build every package target in Debug
 make build-release      Build every package target in Release
+make build-release-universal [UNIVERSAL_OUTPUT=...] Build and validate the macOS 13 arm64+x86_64 executable
 make test               Run safe pure tests
 make test-unit          Run safe pure tests
 make test-ordered-batch TEST_RUN_ID=<uuid> Run the maintainer-only ordered batch acceptance
@@ -827,10 +828,27 @@ git tag -s v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-The signed `vX.Y.Z` tag starts `release.yml`, but the current scaffold fails closed before publication.
-The future release ticket must implement tag and changelog verification, required tests, artifact
-building, signing, notarization, checksums, and GitHub Release publication. Release secrets will be
-available only through the protected `release` environment after maintainer approval.
+The signed `vX.Y.Z` tag starts `release.yml`. The workflow first requires the repository variable
+`RELEASE_ENABLED=true`, runs the guarded integration workflow, and then waits for approval from the
+protected `release` environment. The macOS job runs `make bootstrap`, imports a Developer ID
+certificate into an ephemeral keychain, writes an App Store Connect API key only under `RUNNER_TEMP`,
+and runs `scripts/run-release.sh`. That script verifies the signed tag and dated changelog, runs all
+non-destructive gates, builds macOS 13 arm64 and x86_64 slices, signs the universal executable with
+the hardened runtime, submits a ZIP to `xcrun notarytool`, records the submission and log JSON, runs
+`spctl`, writes a relocatable checksum, and publishes the archive with `gh release create --verify-tag`.
+The notarization log must contain no issues, including warnings, before publication. The cleanup step
+removes the temporary keychain, certificate, and API key on success or failure.
+
+The protected environment must provide `APPLE_SIGNING_IDENTITY` as a repository variable and
+`DEVELOPER_ID_APPLICATION_P12_BASE64`, `DEVELOPER_ID_APPLICATION_P12_PASSWORD`,
+`APPLE_NOTARY_KEY_P8_BASE64`, `APPLE_NOTARY_KEY_ID`, and `APPLE_NOTARY_ISSUER_ID` as environment
+secrets. The workflow passes only the minimum values to the release job; pull requests and ordinary
+CI jobs never receive release credentials.
+
+The initial Homebrew decision is a source-build formula in the maintained tap. v0.1.0 does not promise
+a prebuilt bottle; the tap formula is an owned post-release step after the signed archive checksum is
+available. Release evidence and remaining owner actions are recorded in
+[`docs/release-acceptance-v0.1.0.md`](release-acceptance-v0.1.0.md).
 
 ## 16. Versioning and changelog
 

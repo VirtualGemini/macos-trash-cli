@@ -100,6 +100,18 @@ Trash Finalizers could not be identity-verified and removed. Its `not_moved` or 
 status describes the user item, while the diagnostic describes the internal cleanup failure.
 _Avoid_: Trash Warning, ignored cleanup error
 
+**Recovery Limitation**:
+Finder owns recovery of system Trash entries. A successful Trash Result preserves the exact
+system-returned destination, but Put Back is not guaranteed for every volume, provider, or failure
+state. Release and help surfaces must describe the tested local-volume evidence without claiming
+universal recovery.
+_Avoid_: Undo guarantee, universal restore
+
+**Disk Space Implication**:
+Moving an entry to system Trash normally does not immediately free disk space. tc never exposes an
+empty-Trash or permanent-delete fallback to turn a Trash Operation into a disk-space command.
+_Avoid_: Secure removal, space reclamation
+
 ## Testing Language
 
 **Test Safety Context**:

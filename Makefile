@@ -13,6 +13,7 @@ SWIFT_WARNING_FLAGS := -Xswiftc -warnings-as-errors
 
 .PHONY: bootstrap hooks-install format format-check lint lint-scripts lint-actions \
 	build build-release test test-unit test-integration test-put-back-race \
+	build-release-universal \
 	test-ordered-batch \
 	test-put-back-race-manual test-put-back-symlink-delay-manual \
 	test-put-back-symlink-finalizer-manual test-put-back-symlink-production-manual \
@@ -54,6 +55,11 @@ build-release: check-swift-toolchain
 		-Xswiftc -enable-testing \
 		-Xswiftc -F -Xswiftc "$(DEVELOPER_FRAMEWORKS)"
 
+UNIVERSAL_OUTPUT ?= $(CURDIR)/.artifacts/release-candidate/tc
+
+build-release-universal: check-swift-toolchain
+	./scripts/build-universal-release.sh "$(UNIVERSAL_OUTPUT)"
+
 test: test-unit
 
 test-unit: check-swift-toolchain
@@ -73,6 +79,7 @@ test-policy:
 	Tests/PolicyTests/check-policy-changes-tests.sh
 	Tests/PolicyTests/evidence-path-normalization-tests.sh
 	Tests/PolicyTests/run-integration-tests-tests.sh
+	Tests/PolicyTests/run-release-tests.sh
 	Tests/PolicyTests/check-tool-versions-tests.sh
 	Tests/PolicyTests/check-swift-toolchain-tests.sh
 	Tests/PolicyTests/check-system-trash-boundary-tests.sh

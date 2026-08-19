@@ -19,6 +19,8 @@ enum InformationRenderer {
 
     Move files and directories to the macOS system Trash. Permanent deletion is never used, and
     force options cannot bypass Protected Path checks.
+    Moving an item to Trash does not immediately free disk space. Finder controls recovery, and
+    Put Back is not guaranteed for every volume or failure.
 
     Native options:
       -f, --force             Never confirm and ignore missing paths
@@ -58,12 +60,16 @@ enum InformationRenderer {
       -W               This requests a different operation and is rejected.
 
     --strict-options rejects every no-effect Compatibility Option, including -P.
+
+    Permanent deletion is never used. Moving an item to Trash does not immediately free disk space.
+    Finder controls recovery, and Put Back is not guaranteed for every volume or failure.
     """
 
   private static let primaryChinese = """
     用法：tc [选项] <路径>...
 
-    将文件和目录移入 macOS 系统废纸篓。tc 不会降级为永久删除，强制选项也不能绕过受保护路径检查。
+    将文件和目录移入 macOS 系统废纸篓。tc 绝不执行永久删除，强制选项也不能绕过受保护路径检查。
+    移入废纸篓不会立即释放磁盘空间。恢复由 Finder 控制，并非每个卷或失败场景都保证可以“放回原处”。
 
     原生选项：
       -f, --force             不确认并忽略不存在的路径
@@ -103,5 +109,8 @@ enum InformationRenderer {
       -W               该选项表示不同操作意图，因此拒绝。
 
     --strict-options 会拒绝所有无效果的兼容选项，包括 -P。
+
+    tc 绝不执行永久删除。移入废纸篓不会立即释放磁盘空间。恢复由 Finder 控制，并非每个卷或失败场景
+    都保证可以“放回原处”。
     """
 }

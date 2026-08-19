@@ -12,6 +12,9 @@ top-level Trash Plan to stdout in input order. Each line contains the entry kind
 control characters are escaped so paths containing newlines remain unambiguous. Dry-run mode never
 moves, deletes, overwrites, or sends an item to Trash.
 
+Moving an item to Trash does not immediately free disk space. Finder controls recovery, and Put Back
+is not guaranteed for every volume or failure. tc never permanently deletes an item or empties Trash.
+
 Smart confirmation proceeds without a prompt for one ordinary file or link and asks once for
 multiple top-level inputs or any directory. `never` proceeds without prompting, `once` asks once for
 the complete top-level summary, and `each` asks before each input. `-I` asks once when more than three

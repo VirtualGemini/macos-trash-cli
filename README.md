@@ -3,6 +3,10 @@
 `macos-trash-cli` is a macOS command-line tool. The core command is `tc`.
 It will move files and directories to the system Trash instead of permanently deleting them.
 
+Moving an item to Trash does not immediately free disk space. Finder controls recovery, and Put Back
+is not guaranteed for every volume or failure. tc never provides a permanent-delete or empty-Trash
+fallback.
+
 The current operational slice supports safe Trash Plan previews, deterministic confirmation, and
 approved top-level Trash moves through the complete v0.1-compatible command-line parser:
 
@@ -93,6 +97,30 @@ the usage error. Moved warnings remain successful and do not trigger `--stop-on-
 success, `1` means an operational or safety failure, and `64` means command-line usage failure.
 With `--json`, the empty operation is represented by a complete schema-version-1 document with no
 items. `-W` remains explicitly unsupported.
+
+## Installation and release
+
+The v0.1.0 release workflow builds one macOS 13+ universal executable containing both Apple Silicon
+(`arm64`) and Intel (`x86_64`) slices. The executable is signed with Developer ID, its ZIP archive is
+notarized by Apple, and the archive is published with a SHA-256 checksum on GitHub Releases. The
+archive includes `tc`, the license, notice, README, and version files; it never replaces `/bin/rm` or
+edits shell startup files.
+
+The initial Homebrew strategy is a source-build formula in the project's maintained tap. A bottle is
+not promised for v0.1.0: the tap formula will be published only after the signed GitHub archive and
+checksum exist. Until that tap is published, build the tagged source with Swift Package Manager:
+
+```sh
+git clone https://github.com/VirtualGemini/macos-trash-cli.git
+cd macos-trash-cli
+git checkout v0.1.0
+swift build -c release --product tc
+BIN_DIR=$(swift build -c release --product tc --show-bin-path)
+install -m 755 "$BIN_DIR/tc" "$HOME/.local/bin/tc"
+```
+
+The source-build path produces a local executable and does not claim the signed, notarized release
+artifact. Check the release notes and checksum before distributing a downloaded archive.
 
 ## Project status
 

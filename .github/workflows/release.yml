@@ -49,5 +49,78 @@ jobs:
       - name: Bootstrap pinned tools
         run: make bootstrap
 
+      - name: Require protected release credentials
+        env:
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          DEVELOPER_ID_APPLICATION_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+        run: |
+          set -eu
+          for variable_name in \
+            APPLE_NOTARY_ISSUER_ID \
+            APPLE_NOTARY_KEY_ID \
+            APPLE_NOTARY_KEY_P8_BASE64 \
+            APPLE_SIGNING_IDENTITY \
+            DEVELOPER_ID_APPLICATION_P12_BASE64 \
+            DEVELOPER_ID_APPLICATION_P12_PASSWORD; do
+            eval "variable_value=\${$variable_name:-}"
+            if [ -z "$variable_value" ]; then
+              echo "Missing protected release credential: $variable_name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Install ephemeral Apple release credentials
+        env:
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          DEVELOPER_ID_APPLICATION_P12_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_BASE64 }}
+          DEVELOPER_ID_APPLICATION_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_P12_PASSWORD }}
+        run: |
+          set -eu
+          certificate_path="$RUNNER_TEMP/developer-id-application.p12"
+          notary_key_path="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+          keychain_path="$RUNNER_TEMP/tc-release.keychain-db"
+          keychain_password=$(uuidgen)
+
+          echo "APPLE_NOTARY_KEY_PATH=$notary_key_path" >>"$GITHUB_ENV"
+          echo "RELEASE_KEYCHAIN_PATH=$keychain_path" >>"$GITHUB_ENV"
+
+          printf '%s' "$DEVELOPER_ID_APPLICATION_P12_BASE64" | base64 -D >"$certificate_path"
+          printf '%s' "$APPLE_NOTARY_KEY_P8_BASE64" | base64 -D >"$notary_key_path"
+          chmod 600 "$certificate_path" "$notary_key_path"
+
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" \
+            -k "$keychain_path" \
+            -P "$DEVELOPER_ID_APPLICATION_P12_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+
       - name: Run release pipeline
+        env:
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/run-release.sh "${GITHUB_REF_NAME}"
+
+      - name: Remove ephemeral Apple release credentials
+        if: always()
+        run: |
+          if [ -n "${RELEASE_KEYCHAIN_PATH:-}" ]; then
+            security delete-keychain "$RELEASE_KEYCHAIN_PATH" || true
+          fi
+          rm -f \
+            "$RUNNER_TEMP/developer-id-application.p12" \
+            "$RUNNER_TEMP"/AuthKey_*.p8

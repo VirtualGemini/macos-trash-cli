@@ -108,6 +108,7 @@
       "name": "release-and-installation",
       "paths": [
         ".github/workflows/release.yml",
+        "scripts/build-universal-release.sh",
         "scripts/run-release.sh"
       ],
       "documents": ["README.md", "docs/development.md", "CHANGELOG.md"],

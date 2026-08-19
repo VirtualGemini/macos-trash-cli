@@ -4,10 +4,22 @@ All notable user-visible changes to this project will be documented in this file
 
 The format is based on Keep a Changelog, and the project follows Semantic Versioning.
 
-## Unreleased
+## [Unreleased]
+
+No user-facing changes are recorded after the v0.1.0 release candidate.
+
+## [0.1.0] - 2026-08-19
 
 ### Changed
 
+- Align primary help, Compatibility Option help, README, security guidance, and release notes on
+  Trash-only semantics: moving an item does not immediately free disk space, Finder controls recovery,
+  Put Back is not universally guaranteed, no option enables permanent deletion, and `-r`/`-R`/`-d`/`-x`,
+  `-P`, and `-W` remain no-effect, warned, and unsupported Compatibility Options respectively.
+- Build a macOS 13 universal `arm64` and `x86_64` release executable, require a GitHub-verified signed
+  annotated tag, sign with Developer ID and the hardened runtime, reject any Apple notarization issue,
+  assess with Gatekeeper, publish a relocatable SHA-256 checksum, and create the GitHub Release only
+  from the protected release environment.
 - Rename the complete product and Swift package to `macos-trash-cli`, with `tc` as the sole
   production command and `tc-test` as the compile-time-isolated acceptance command. Rename all
   product-specific modules, symbols, safety paths, fixtures, repository policy, tracker paths, and
