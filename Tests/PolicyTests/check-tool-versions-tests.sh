@@ -39,4 +39,13 @@ fi
 cp "$TEMP_DIR/development.md.ok" "$repo/docs/development.md"
 
 "$repo/scripts/check-tool-versions.sh"
+
+for workflow in ci.yml release.yml; do
+  workflow_path="$ROOT/.github/workflows/$workflow"
+  if ! grep -Eq '^[[:space:]]*run: brew install swiftlint[[:space:]]*$' "$workflow_path"; then
+    echo "test failure: $workflow must install SwiftLint before running CI gates" >&2
+    exit 1
+  fi
+done
+
 echo "Tool version tests passed."

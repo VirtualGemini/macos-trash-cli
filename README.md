@@ -139,6 +139,9 @@ install -m 755 "$BIN_DIR/tc" "$HOME/.local/bin/tc"
 The source-build path produces a local executable. Check the release notes and published checksum
 before distributing a downloaded archive.
 
+Contributors running the local CI gates need Homebrew SwiftLint; the macOS CI and release workflows
+install it explicitly on clean runners.
+
 ## Project status
 
 - Product requirements: [`.scratch/macos-trash-cli/spec.md`](.scratch/macos-trash-cli/spec.md)

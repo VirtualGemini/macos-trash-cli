@@ -33,6 +33,8 @@ No user-facing changes are recorded after the v0.1.0 release candidate.
   unsupported.
 - Ratchet the production line-coverage baseline from 97.31% to 97.48% with Exit Status Compatibility
   tests, without changing the coverage metric.
+- Make the macOS CI and release workflows install SwiftLint explicitly so clean runners use the
+  documented lint tool.
 
 - Route approved Trash Inputs through Finder's Apple Event `delete` command, pass path text as a
   structured argument, and preserve the returned Finder item URL for ordinary files and directories.

@@ -46,6 +46,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
       - name: Bootstrap pinned tools
         run: make bootstrap
 

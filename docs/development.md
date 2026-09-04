@@ -30,7 +30,8 @@ with the compiler.
 Shell tooling reads it through `scripts/lib/tool-versions.sh`; the consistency gate verifies that
 `Package.swift` declares no SwiftLint dependency (ADR-0004) and that this document records the
 pinned SwiftLint version. Homebrew builds stay isolated because the package declares no
-third-party dependencies.
+third-party dependencies. The macOS CI and release workflows install SwiftLint with Homebrew before
+running the gates; local developers should install it with `brew install swiftlint`.
 
 The unit-test command explicitly supplies the active developer directory's Testing framework and
 interop-library paths at compile and runtime. This keeps Swift Testing discoverable in both full
