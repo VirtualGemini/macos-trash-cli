@@ -20,4 +20,37 @@ fi
 sha=$(sed -n 's/^actions-checkout=//p' "$repo/.tool-versions.lock")
 printf '%s\n' 'steps:' "  - uses: \"actions/checkout@$sha\"" >"$repo/.github/workflows/test.yml"
 "$repo/scripts/check-tool-versions.sh"
+
+cp "$repo/Package.swift" "$TEMP_DIR/Package.swift.ok"
+printf '%s\n' '    .package(url: "https://github.com/realm/SwiftLint.git", exact: "0.65.0")' >>"$repo/Package.swift"
+if "$repo/scripts/check-tool-versions.sh" >/dev/null 2>&1; then
+  echo "test failure: SwiftLint package dependency was accepted" >&2
+  exit 1
+fi
+cp "$TEMP_DIR/Package.swift.ok" "$repo/Package.swift"
+
+cp "$repo/docs/development.md" "$TEMP_DIR/development.md.ok"
+swiftlint_version=$(sed -n 's/^swiftlint=//p' "$repo/.tool-versions.lock")
+sed "s/SwiftLint $swiftlint_version/SwiftLint 0.0.0/" "$TEMP_DIR/development.md.ok" >"$repo/docs/development.md"
+if "$repo/scripts/check-tool-versions.sh" >/dev/null 2>&1; then
+  echo "test failure: SwiftLint documentation version drift was accepted" >&2
+  exit 1
+fi
+cp "$TEMP_DIR/development.md.ok" "$repo/docs/development.md"
+
+"$repo/scripts/check-tool-versions.sh"
+
+for workflow in ci.yml release.yml; do
+  workflow_path="$ROOT/.github/workflows/$workflow"
+  if ! grep -Eq '^[[:space:]]*run: brew install swiftlint[[:space:]]*$' "$workflow_path"; then
+    echo "test failure: $workflow must install SwiftLint before running CI gates" >&2
+    exit 1
+  fi
+done
+
+if grep -Fq '.build/checkouts/SwiftLint' "$ROOT/.githooks/pre-push"; then
+  echo 'test failure: pre-push must not require the removed SwiftPM SwiftLint checkout' >&2
+  exit 1
+fi
+
 echo "Tool version tests passed."

@@ -8,6 +8,7 @@ TestSupport/** @VirtualGemini
 .githooks/commit-msg @VirtualGemini
 .github/workflows/ci.yml @VirtualGemini
 scripts/run-release.sh @VirtualGemini
+scripts/build-universal-release.sh @VirtualGemini
 scripts/check-breaking-change-approvals.sh @VirtualGemini
 scripts/check-doc-impact*.sh @VirtualGemini
 scripts/check-commits.sh @VirtualGemini

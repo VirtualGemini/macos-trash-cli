@@ -896,9 +896,18 @@ Context 内创建自己的文件、空目录、深层目录、特殊字符文件
 ## 19. 发布与分发
 
 - 使用 Swift Package Manager 构建。
+- 最低支持 macOS 13；发布候选必须同时通过 Apple Silicon `arm64` 与 Intel `x86_64` slice 的
+  Release 构建，并在合并 universal binary 后再次验证两个架构和 `minos 13.0`。
 - 提供 Apple Silicon 和 Intel 架构支持；发布形式可为 universal binary 或分别构建。
 - 首选 GitHub Releases 与 Homebrew 分发。
-- 发布二进制应使用 Developer ID 签名并进行 Apple notarization。
+- 可选的 GitHub Release 二进制为未签名的 universal `zip` 和 `tar.gz`，各自附带可重定位的
+  SHA-256 checksum；v0.1.0 不要求 Apple Developer ID 签名或 notarization（ADR-0004）。
+- v0.1.0 首版 Homebrew 采用维护 tap 中的源码构建 formula，不承诺预编译 bottle；formula 在
+  标签源码和 release checksum 可用后由维护者执行。
+- 发布脚本必须在 GitHub-verified signed annotated tag、dated changelog、所有非破坏性 CI 门禁、
+  两个架构构建、版本输出和可重定位 SHA-256 checksum 均通过后，才创建 GitHub Release。发布
+  API 凭据只允许受保护的 `release` environment 使用；不再设置 Apple 签名、公证或 Gatekeeper
+  门禁。
 - 安装不得覆盖 `/bin/rm`，也不得自动修改用户 shell 配置。
 - README 可以给出用户自愿设置 alias/function 的示例，并明确脚本语义差异。
 
@@ -993,9 +1002,12 @@ Context 内创建自己的文件、空目录、深层目录、特殊字符文件
 17. 本地测试不存在对系统废纸篓目标调用永久删除 API的代码路径。
 18. 本地测试清理只能删除已验证且为空的 run 目录，不能递归清理或删除两层固定安全目录。
 
-## 24. 待实现阶段验证的决策
+## 24. 已确定的阶段验证决策
 
-以下项目不阻塞 PRD，但必须在实现对应功能前确定：
+以下 v0.1.0 决策已在发布验收中确定：
 
-- 最低 macOS 版本是否需要低于 macOS 13。
-- Homebrew 首版采用源码构建还是预编译 bottle。
+- 最低 macOS 版本为 macOS 13，不降低到更早版本。
+- ADR-0004 确定源码分发为主要路径，可选二进制归档保持未签名；不要求 Apple Developer Program
+  会员、Developer ID 签名或 notarization。
+- Homebrew 首版采用维护 tap 中的源码构建 formula，不承诺预编译 bottle；GitHub archive 和
+  checksum 发布后由维护者执行 formula 发布。

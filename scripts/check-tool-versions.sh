@@ -7,11 +7,12 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 . "$ROOT/scripts/lib/tool-versions.sh"
 
 swiftlint_version=$(tool_value swiftlint)
-if ! grep -Eq "^[[:space:]]*\.package\(url: .*SwiftLint\.git.*, exact: \"$swiftlint_version\"\)" \
-  "$ROOT/Package.swift"; then
-  echo "error: Package.swift SwiftLint version must match .tool-versions.lock" >&2
+if grep -Eq "SwiftLint\.git" "$ROOT/Package.swift"; then
+  echo "error: Package.swift must not declare a SwiftLint dependency (ADR-0004)" >&2
   exit 1
 fi
+grep -Fq "SwiftLint $swiftlint_version" "$ROOT/docs/development.md" \
+  || { echo "error: documented SwiftLint version must match .tool-versions.lock" >&2; exit 1; }
 
 swift_mode=$(tool_value swift-language-mode)
 grep -Fq "// swift-tools-version: $swift_mode.0" "$ROOT/Package.swift" \

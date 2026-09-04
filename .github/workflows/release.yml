@@ -22,7 +22,7 @@ jobs:
           RELEASE_ENABLED: ${{ vars.RELEASE_ENABLED }}
         run: |
           if [ "$RELEASE_ENABLED" != "true" ]; then
-            echo "Release publication is disabled. Set RELEASE_ENABLED=true after signing is configured." >&2
+            echo "Release publication is disabled. Set RELEASE_ENABLED=true to enable." >&2
             exit 1
           fi
 
@@ -32,7 +32,7 @@ jobs:
     uses: ./.github/workflows/integration.yml
 
   publish:
-    name: Build, sign, notarize, and publish
+    name: Build and publish unsigned archives
     needs: integration
     runs-on: macos-latest
     timeout-minutes: 45
@@ -46,8 +46,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install SwiftLint
+        run: brew install swiftlint
+
       - name: Bootstrap pinned tools
         run: make bootstrap
 
       - name: Run release pipeline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/run-release.sh "${GITHUB_REF_NAME}"

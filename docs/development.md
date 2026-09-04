@@ -18,7 +18,7 @@ releasing tc. Pull requests must update it when they change the development work
 
 Pinned development-tool versions are recorded in `.tool-versions.lock`:
 
-- SwiftLint 0.65.0 from the official `realm/SwiftLint` repository;
+- SwiftLint 0.65.0 installed via Homebrew (`brew install swiftlint`);
 - ShellCheck 0.11.0;
 - actionlint 1.7.12;
 - `actions/checkout` pinned to its full reviewed commit SHA.
@@ -27,8 +27,11 @@ Pinned development-tool versions are recorded in `.tool-versions.lock`:
 with the compiler.
 
 `.tool-versions.lock` is the authoritative source for development-tool versions and checksums.
-Shell tooling reads it through `scripts/lib/tool-versions.sh`; the consistency gate verifies the
-SwiftLint version duplicated by necessity in the SwiftPM manifest.
+Shell tooling reads it through `scripts/lib/tool-versions.sh`; the consistency gate verifies that
+`Package.swift` declares no SwiftLint dependency (ADR-0004) and that this document records the
+pinned SwiftLint version. Homebrew builds stay isolated because the package declares no
+third-party dependencies. The macOS CI and release workflows install SwiftLint with Homebrew before
+running the gates; local developers should install it with `brew install swiftlint`.
 
 The unit-test command explicitly supplies the active developer directory's Testing framework and
 interop-library paths at compile and runtime. This keeps Swift Testing discoverable in both full
@@ -41,8 +44,10 @@ unrelated test compilation errors.
 ## 2. Dependency policy
 
 - Third-party runtime dependencies are prohibited in v0.1.
-- Development dependencies must use an exact version.
-- `Package.resolved` is committed.
+- Development dependencies must use an exact version; v0.1 declares none, so `Package.swift`
+  contains no SwiftLint or other package dependency (ADR-0004).
+- `Package.resolved` is committed; v0.1 declares no dependencies (ADR-0004), so the committed
+  resolution carries no pins once regenerated with `make bootstrap`.
 - Branch, floating `latest`, and unpublished commit dependencies are prohibited.
 - A new dependency proposal must state its purpose, license, maintenance status, alternatives, and
   removal cost.
@@ -132,8 +137,9 @@ not retain or upload the absolute paths it emits.
 
 - `swift-format` is the only Swift formatter.
 - SwiftLint supplies a small safety-focused semantic rule set.
-- The lint wrapper executes SwiftLint's resolved binary artifact without `--fix` and supplies both
-  Xcode and Command Line Tools SourceKit framework locations so it works with either active developer
+- The lint wrapper prefers a `brew`-installed `swiftlint` without `--fix`, falls back to the legacy
+  SwiftPM artifact under `.build/artifacts/swiftlint` when present, and supplies both Xcode and
+  Command Line Tools SourceKit framework locations so it works with either active developer
   directory.
 - CI checks formatting and never rewrites source files.
 - Developers run `make format` explicitly.
@@ -476,6 +482,7 @@ make lint-actions       Run actionlint
 make check-swift-toolchain Verify compiler, SDK, and Testing.framework compatibility
 make build              Build every package target in Debug
 make build-release      Build every package target in Release
+make build-release-universal [UNIVERSAL_OUTPUT=...] Build and validate the macOS 13 arm64+x86_64 executable
 make test               Run safe pure tests
 make test-unit          Run safe pure tests
 make test-ordered-batch TEST_RUN_ID=<uuid> Run the maintainer-only ordered batch acceptance
@@ -509,7 +516,8 @@ two path forms and verifies that neither host path survives normalization.
 
 Hooks and validation scripts never download dependencies. The explicitly invoked `make bootstrap`
 command may download only the pinned, checksum-verified development tools recorded in
-`.tool-versions.lock` and resolve the exact SwiftPM development dependency.
+`.tool-versions.lock` and resolve the Swift package (which declares no third-party dependencies in
+v0.1 so isolated source builds fetch nothing).
 
 ## 8. Git hooks and quality gates
 
@@ -543,6 +551,9 @@ automatically.
 - Debug and Release build;
 - pure unit tests;
 - no real Trash integration.
+
+The pre-push hook runs these checks directly and does not require a SwiftPM SwiftLint checkout;
+SwiftLint is provided by the Homebrew-based wrapper described above.
 
 CI repeats all enforceable checks. Local hooks are convenience and may never be the only gate.
 The documentation-impact checker is a POSIX shell command and uses macOS `plutil` to read the
@@ -827,14 +838,31 @@ git tag -s v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
 
-The signed `vX.Y.Z` tag starts `release.yml`, but the current scaffold fails closed before publication.
-The future release ticket must implement tag and changelog verification, required tests, artifact
-building, signing, notarization, checksums, and GitHub Release publication. Release secrets will be
-available only through the protected `release` environment after maintainer approval.
+The GitHub-verified signed `vX.Y.Z` or `vX.Y.Z-beta.N` tag starts `release.yml`. The workflow
+first requires the repository variable `RELEASE_ENABLED=true`, runs the guarded integration
+workflow, and then waits for approval from the protected `release` environment. The macOS job runs
+`make bootstrap` and `scripts/run-release.sh`. That script verifies the GitHub-verified tag and
+dated changelog, runs all non-destructive gates, builds macOS 13 arm64 and x86_64 slices, validates
+`tc --version`, produces unsigned `zip` and `tar.gz` archives with `sha256` files, and publishes
+them with `gh release create --verify-tag`. Beta tags are published with the additional
+`--prerelease` flag and never touch the Homebrew tap. No Apple signing, notarization, or `spctl`
+is performed (ADR-0004). For stable releases, when `HOMEBREW_TAP_DIR` is configured, the script
+auto-bumps `VirtualGemini/homebrew-tap`.
+
+The protected `release` environment needs only `GH_TOKEN` (provided by GitHub). No Apple Developer
+Program membership or `APPLE_*` secrets are required. Pull requests and ordinary CI jobs never receive
+release credentials.
+
+The initial Homebrew decision is a source-build formula in the maintained tap
+`VirtualGemini/homebrew-tap`. v0.1.0 does not promise a prebuilt bottle; the tap formula is an owned
+post-release step after the unsigned archive checksums are available. Release evidence and remaining
+owner actions are recorded in [`docs/release-acceptance-v0.1.0.md`](release-acceptance-v0.1.0.md).
 
 ## 16. Versioning and changelog
 
-The project uses Semantic Versioning and signed `vX.Y.Z` tags.
+The project uses Semantic Versioning with signed `vX.Y.Z` tags for stable releases and
+`vX.Y.Z-beta.N` tags for prereleases. Beta releases are published as GitHub prereleases for
+pipeline and installer validation; the Homebrew tap tracks stable releases only.
 
 - `fix` normally increments patch.
 - non-breaking `feat` increments minor.
@@ -846,10 +874,10 @@ The project uses Semantic Versioning and signed `vX.Y.Z` tags.
 
 ## 17. Release security
 
-- Pull requests never receive signing or notarization secrets.
+- Pull requests never receive release credentials.
 - Workflows use minimum read-only permissions unless a job documents a narrower required write.
 - External Actions are pinned to a full commit SHA.
-- Release tags are cryptographically signed.
+- Release tags are GitHub-verified signed tags; Apple signing is not used (ADR-0004).
 - The `release` GitHub Environment requires maintainer approval.
-- The release workflow remains disabled until signing and notarization secrets are configured and the
-  maintainer explicitly enables release publication.
+- The release workflow remains disabled until `RELEASE_ENABLED=true` and the maintainer explicitly
+  enables release publication.

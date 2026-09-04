@@ -128,6 +128,26 @@ func helpSurfacesExplainCompatibilityConsistently() {
   #expect(compatibilityChinese.contains("不支持"))
 }
 
+@Test("All help surfaces explain disk-space and Finder recovery limitations")
+func helpSurfacesExplainReleaseLimitations() {
+  let application = CLIApplication(makeFileSystem: { CountingTrashPlanningFileSystem() })
+  let primary = application.run(arguments: ["--help"]).standardOutput
+  let compatibility = application.run(arguments: ["--help", "-a"]).standardOutput
+  let primaryChinese = application.run(arguments: ["--help", "-zh"]).standardOutput
+  let compatibilityChinese = application.run(arguments: ["--help", "-a", "-zh"]).standardOutput
+
+  for help in [primary, compatibility] {
+    #expect(help.contains("does not immediately free disk space"))
+    #expect(help.contains("Finder controls recovery"))
+    #expect(help.contains("Permanent deletion is never used"))
+  }
+  for help in [primaryChinese, compatibilityChinese] {
+    #expect(help.contains("不会立即释放磁盘空间"))
+    #expect(help.contains("恢复由 Finder 控制"))
+    #expect(help.contains("绝不执行永久删除"))
+  }
+}
+
 @Test("Primary help keeps exactly three examples in both languages")
 func primaryHelpKeepsThreeExamples() {
   let application = CLIApplication(makeFileSystem: { CountingTrashPlanningFileSystem() })

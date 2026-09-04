@@ -10,9 +10,7 @@ let package = Package(
     .executable(name: "tc", targets: ["tc"]),
     .executable(name: "tc-test", targets: ["tc-test"]),
   ],
-  dependencies: [
-    .package(url: "https://github.com/realm/SwiftLint.git", exact: "0.65.0")
-  ],
+  dependencies: [],
   targets: [
     .target(name: "TrashCore"),
     .target(name: "TrashPlatform", dependencies: ["TrashCore"]),

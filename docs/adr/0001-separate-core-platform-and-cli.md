@@ -72,3 +72,7 @@ Workspace callers during a rapid same-name re-trash. The maintainer accepted the
 Automation authorization cost so Finder can be the writer for ordinary Trash Operations. The
 ticket's maintainer-run Automation and Put Back differentials are complete on the reporting host;
 the recorded evidence and remaining release decision live in issue 12.
+
+For v0.1, `Package.swift` intentionally declares no third-party package dependencies; SwiftLint is a
+separately installed development tool as recorded in ADR-0004. This dependency cleanup does not
+change the module ownership, Interfaces, or safety boundaries described in this decision.

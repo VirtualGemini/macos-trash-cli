@@ -100,6 +100,33 @@ Trash Finalizers could not be identity-verified and removed. Its `not_moved` or 
 status describes the user item, while the diagnostic describes the internal cleanup failure.
 _Avoid_: Trash Warning, ignored cleanup error
 
+**Recovery Limitation**:
+Finder owns recovery of system Trash entries. A successful Trash Result preserves the exact
+system-returned destination, but Put Back is not guaranteed for every volume, provider, or failure
+state. Release and help surfaces must describe the tested local-volume evidence without claiming
+universal recovery.
+_Avoid_: Undo guarantee, universal restore
+
+**Disk Space Implication**:
+Moving an entry to system Trash normally does not immediately free disk space. tc never exposes an
+empty-Trash or permanent-delete fallback to turn a Trash Operation into a disk-space command.
+_Avoid_: Secure removal, space reclamation
+
+## Distribution Language
+
+**Source Distribution**:
+The primary v0.1.0 distribution form where the Swift source archive for a Git-verified tag is built locally.
+_Avoid_: Signed distribution, notarized artifact
+
+**Unsigned Binary Archive**:
+An optional GitHub Release asset containing the prebuilt universal `tc` executable without Apple signing or notarization.
+It is distributed as both `zip` and `tar.gz` with detached `sha256` files and may trigger Gatekeeper on first launch.
+_Avoid_: Signed binary, notarized installer
+
+**Homebrew Tap Source Build**:
+The Homebrew distribution that builds `tc` from the Source Distribution in `VirtualGemini/homebrew-tap`.
+_Avoid_: Homebrew bottle, Homebrew cask
+
 ## Testing Language
 
 **Test Safety Context**:

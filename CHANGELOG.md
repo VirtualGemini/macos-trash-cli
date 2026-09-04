@@ -4,10 +4,23 @@ All notable user-visible changes to this project will be documented in this file
 
 The format is based on Keep a Changelog, and the project follows Semantic Versioning.
 
-## Unreleased
+## [Unreleased]
+
+No user-facing changes are recorded after the v0.1.0 release candidate.
+
+## [0.1.0] - 2026-08-19
 
 ### Changed
 
+- Align primary help, Compatibility Option help, README, security guidance, and release notes on
+  Trash-only semantics: moving an item does not immediately free disk space, Finder controls recovery,
+  Put Back is not universally guaranteed, no option enables permanent deletion, and `-r`/`-R`/`-d`/`-x`,
+  `-P`, and `-W` remain no-effect, warned, and unsupported Compatibility Options respectively.
+- Build a macOS 13 universal `arm64` and `x86_64` release executable and require a GitHub-verified
+  signed annotated tag. Publish unsigned `zip` and `tar.gz` archives with relocatable SHA-256
+  checksums from the protected release environment with no Apple signing or notarization (ADR-0004).
+  Install the primary distribution from source via `brew install VirtualGemini/tap/macos-trash-cli`
+  or `swift build -c release --product tc`; unsigned binaries may trigger Gatekeeper on first launch.
 - Rename the complete product and Swift package to `macos-trash-cli`, with `tc` as the sole
   production command and `tc-test` as the compile-time-isolated acceptance command. Rename all
   product-specific modules, symbols, safety paths, fixtures, repository policy, tracker paths, and
@@ -20,6 +33,8 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
   unsupported.
 - Ratchet the production line-coverage baseline from 97.31% to 97.48% with Exit Status Compatibility
   tests, without changing the coverage metric.
+- Make the macOS CI and release workflows install SwiftLint explicitly so clean runners use the
+  documented lint tool.
 
 - Route approved Trash Inputs through Finder's Apple Event `delete` command, pass path text as a
   structured argument, and preserve the returned Finder item URL for ordinary files and directories.
