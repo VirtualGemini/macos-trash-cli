@@ -29,5 +29,6 @@ sdk 26.5
 
 The unsigned local candidate SHA-256 was
 `5732bcd66a25ac204f47780606c5d1da1e32579412b21e1e3b27975c8a30c96a`. This checksum identifies
-only the local architecture evidence. The protected release workflow rebuilds the executable, applies
-the Developer ID signature, notarizes the ZIP, and publishes a separate checksum for the final archive.
+only the local architecture evidence. Under ADR-0004, the protected release workflow rebuilds the
+executable and publishes unsigned `zip` and `tar.gz` archives with separate checksums; Apple signing
+and notarization are not performed.

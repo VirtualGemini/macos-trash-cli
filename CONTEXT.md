@@ -112,6 +112,21 @@ Moving an entry to system Trash normally does not immediately free disk space. t
 empty-Trash or permanent-delete fallback to turn a Trash Operation into a disk-space command.
 _Avoid_: Secure removal, space reclamation
 
+## Distribution Language
+
+**Source Distribution**:
+The primary v0.1.0 distribution form where the Swift source archive for a Git-verified tag is built locally.
+_Avoid_: Signed distribution, notarized artifact
+
+**Unsigned Binary Archive**:
+An optional GitHub Release asset containing the prebuilt universal `tc` executable without Apple signing or notarization.
+It is distributed as both `zip` and `tar.gz` with detached `sha256` files and may trigger Gatekeeper on first launch.
+_Avoid_: Signed binary, notarized installer
+
+**Homebrew Tap Source Build**:
+The Homebrew distribution that builds `tc` from the Source Distribution in `VirtualGemini/homebrew-tap`.
+_Avoid_: Homebrew bottle, Homebrew cask
+
 ## Testing Language
 
 **Test Safety Context**:

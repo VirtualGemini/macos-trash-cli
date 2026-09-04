@@ -25,35 +25,34 @@ require_environment() {
 }
 
 if [ "$#" -ne 1 ]; then
-  echo "usage: $0 <vX.Y.Z>" >&2
+  echo "usage: $0 <vX.Y.Z[-beta.N]>" >&2
   exit 2
 fi
 
 tag=$1
 
-if ! printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-  echo "error: release tag must use vX.Y.Z" >&2
+if ! printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$'; then
+  echo "error: release tag must use vX.Y.Z or vX.Y.Z-beta.N" >&2
   exit 1
 fi
 
 version=${tag#v}
+is_prerelease=false
+case "$tag" in
+  *-beta.*) is_prerelease=true ;;
+esac
+if [ "$is_prerelease" = true ]; then
+  prerelease_args="--prerelease"
+else
+  prerelease_args=""
+fi
 release_notes="$ROOT/docs/releases/$tag.md"
 output_dir=${RELEASE_OUTPUT_DIR:-"$ROOT/.artifacts/releases/$tag"}
 
-for command_name in awk codesign ditto gh git grep lipo make plutil shasum spctl swift xcrun; do
+for command_name in awk ditto gh git grep lipo make shasum swift tar xcrun; do
   require_command "$command_name"
 done
-for variable_name in \
-  APPLE_SIGNING_IDENTITY \
-  APPLE_NOTARY_KEY_PATH \
-  APPLE_NOTARY_KEY_ID \
-  APPLE_NOTARY_ISSUER_ID \
-  GH_TOKEN; do
-  require_environment "$variable_name"
-done
-if [ ! -f "$APPLE_NOTARY_KEY_PATH" ]; then
-  fail "APPLE_NOTARY_KEY_PATH must name a readable App Store Connect API key"
-fi
+require_environment GH_TOKEN
 
 cd "$ROOT"
 if [ -n "$(git status --porcelain)" ]; then
@@ -106,14 +105,6 @@ mkdir -p "$package_dir"
 universal_binary="$package_dir/tc"
 "$ROOT/scripts/build-universal-release.sh" "$universal_binary"
 
-codesign \
-  --force \
-  --options runtime \
-  --timestamp \
-  --sign "$APPLE_SIGNING_IDENTITY" \
-  "$universal_binary"
-codesign --verify --strict --verbose=2 "$universal_binary"
-
 version_output=$("$universal_binary" --version)
 if [ "$version_output" != "tc $version" ]; then
   fail "release executable reports '$version_output' instead of 'tc $version'"
@@ -122,57 +113,81 @@ fi
 cp LICENSE NOTICE README.md "$package_dir/"
 printf '%s\n' "$version" >"$package_dir/VERSION"
 mkdir -p "$output_dir"
-archive="$output_dir/$package_name.zip"
-checksum="$archive.sha256"
-submission="$output_dir/macos-trash-cli-$tag-notarization.json"
-notary_log="$output_dir/macos-trash-cli-$tag-notarization-log.json"
-for artifact in "$archive" "$checksum" "$submission" "$notary_log"; do
+archive_zip="$output_dir/$package_name.zip"
+archive_tar="$output_dir/$package_name.tar.gz"
+checksum_zip="$archive_zip.sha256"
+checksum_tar="$archive_tar.sha256"
+for artifact in "$archive_zip" "$checksum_zip" "$archive_tar" "$checksum_tar"; do
   if [ -e "$artifact" ]; then
     fail "release artifact already exists: $artifact"
   fi
 done
 
-ditto -c -k --sequesterRsrc --keepParent "$package_dir" "$archive"
-xcrun notarytool submit "$archive" \
-  --key "$APPLE_NOTARY_KEY_PATH" \
-  --key-id "$APPLE_NOTARY_KEY_ID" \
-  --issuer "$APPLE_NOTARY_ISSUER_ID" \
-  --wait \
-  --output-format json >"$submission"
+ditto -c -k --sequesterRsrc --keepParent "$package_dir" "$archive_zip"
+tar -czf "$archive_tar" -C "$work_dir" "$package_name"
 
-notary_status=$(plutil -extract status raw "$submission")
-if [ "$notary_status" != Accepted ]; then
-  fail "Apple notarization did not accept the release archive"
-fi
-submission_id=$(plutil -extract id raw "$submission")
-xcrun notarytool log \
-  --key "$APPLE_NOTARY_KEY_PATH" \
-  --key-id "$APPLE_NOTARY_KEY_ID" \
-  --issuer "$APPLE_NOTARY_ISSUER_ID" \
-  "$submission_id" >"$notary_log"
-notary_issues_type=$(plutil -type issues "$notary_log")
-case "$notary_issues_type" in
-  '(any)') ;;
-  array)
-    notary_issue_count=$(plutil -extract issues raw "$notary_log")
-    if [ "$notary_issue_count" -ne 0 ]; then
-      fail "Apple notarization log contains issues; inspect $notary_log"
-    fi
-    ;;
-  *) fail "Apple notarization log has an unexpected issues field" ;;
-esac
+archive_zip_hash=$(shasum -a 256 "$archive_zip" | awk '{ print $1 }')
+printf '%s  %s\n' "$archive_zip_hash" "$(basename "$archive_zip")" >"$checksum_zip"
+archive_tar_hash=$(shasum -a 256 "$archive_tar" | awk '{ print $1 }')
+printf '%s  %s\n' "$archive_tar_hash" "$(basename "$archive_tar")" >"$checksum_tar"
 
-spctl --assess --type execute --verbose=4 "$universal_binary"
-archive_hash=$(shasum -a 256 "$archive" | awk '{ print $1 }')
-printf '%s  %s\n' "$archive_hash" "$(basename "$archive")" >"$checksum"
-
+# shellcheck disable=SC2086 # Intentional conditional prerelease flag.
 gh release create "$tag" \
-  "$archive#Universal signed and notarized macOS command" \
-  "$checksum#SHA-256 checksum" \
-  "$submission#Apple notarization submission" \
-  "$notary_log#Apple notarization log" \
-  --verify-tag \
+  "$archive_zip#Universal unsigned macOS command (zip)" \
+  "$checksum_zip#SHA-256 checksum (zip)" \
+  "$archive_tar#Universal unsigned macOS command (tar.gz)" \
+  "$checksum_tar#SHA-256 checksum (tar.gz)" \
+  $prerelease_args --verify-tag \
   --title "macos-trash-cli $tag" \
   --notes-file "$release_notes"
 
 printf 'published %s with architectures: %s\n' "$tag" "$(lipo "$universal_binary" -archs)"
+printf 'zip: %s  sha256 %s\n' "$archive_zip" "$archive_zip_hash"
+printf 'tar.gz: %s  sha256 %s\n' "$archive_tar" "$archive_tar_hash"
+
+# Optional Homebrew Tap bump (source-build formula). Prereleases never touch the tap;
+# the tap tracks stable releases only.
+tap_dir=${HOMEBREW_TAP_DIR:-}
+tap_repo=${HOMEBREW_TAP_GITHUB_REPO:-VirtualGemini/homebrew-tap}
+if [ "$is_prerelease" = true ]; then
+  printf 'skipping tap bump for prerelease %s; tap tracks stable releases\n' "$tag" >&2
+  printf '     zip sha256: %s\n' "$archive_zip_hash" >&2
+  printf '     tar.gz sha256: %s\n' "$archive_tar_hash" >&2
+elif [ -n "$tap_dir" ]; then
+  if [ ! -d "$tap_dir/.git" ]; then
+    echo "warning: HOMEBREW_TAP_DIR does not look like a git repo: $tap_dir" >&2
+  elif [ -n "$(git -C "$tap_dir" status --porcelain)" ]; then
+    echo "warning: tap repo has a dirty working tree; skipping automatic bump: $tap_dir" >&2
+  else
+    formula_path="$tap_dir/Formula/macos-trash-cli.rb"
+    if [ ! -f "$formula_path" ]; then
+      echo "warning: formula not found at $formula_path; skipping automatic bump" >&2
+    else
+      # Prefer zip sha for formula url; keep tar url commented alternative.
+      if grep -q 'sha256' "$formula_path"; then
+        # Use awk to replace first sha256 occurrence; keep file formatting stable.
+        tmp_formula=$(mktemp "${TMPDIR:-/tmp}/tc-formula.XXXXXX")
+        awk -v h="$archive_zip_hash" 'BEGIN{c=0} /sha256/ && c==0 {sub(/"[a-f0-9]{64}"/, "\"" h "\""); c=1} {print}' "$formula_path" >"$tmp_formula" && mv "$tmp_formula" "$formula_path"
+      fi
+      # Update url and version if template contains them.
+      if grep -q 'url "https://github.com/.*archive/refs/tags/' "$formula_path"; then
+        tmp_formula=$(mktemp "${TMPDIR:-/tmp}/tc-formula.XXXXXX")
+        awk -v t="$tag" '{gsub(/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/, t ".tar.gz"); print}' "$formula_path" >"$tmp_formula" && mv "$tmp_formula" "$formula_path"
+      fi
+      git -C "$tap_dir" add "$formula_path"
+      if git -C "$tap_dir" diff --cached --quiet; then
+        echo "tap formula already up to date; no commit needed" >&2
+      elif ! git -C "$tap_dir" commit -m "macos-trash-cli $tag"; then
+        echo "warning: tap formula commit failed; GitHub Release above remains published" >&2
+      elif ! git -C "$tap_dir" push origin HEAD; then
+        echo "warning: tap push failed; GitHub Release above remains published (repo: $tap_repo)" >&2
+      else
+        printf 'pushed tap bump for %s to %s\n' "$tag" "$tap_repo" >&2
+      fi
+    fi
+  fi
+else
+  printf 'tip: set HOMEBREW_TAP_DIR to auto-push Formula bump (repo: %s)\n' "$tap_repo" >&2
+  printf '     zip sha256: %s\n' "$archive_zip_hash" >&2
+  printf '     tar.gz sha256: %s\n' "$archive_tar_hash" >&2
+fi

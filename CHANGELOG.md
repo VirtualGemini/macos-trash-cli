@@ -16,10 +16,11 @@ No user-facing changes are recorded after the v0.1.0 release candidate.
   Trash-only semantics: moving an item does not immediately free disk space, Finder controls recovery,
   Put Back is not universally guaranteed, no option enables permanent deletion, and `-r`/`-R`/`-d`/`-x`,
   `-P`, and `-W` remain no-effect, warned, and unsupported Compatibility Options respectively.
-- Build a macOS 13 universal `arm64` and `x86_64` release executable, require a GitHub-verified signed
-  annotated tag, sign with Developer ID and the hardened runtime, reject any Apple notarization issue,
-  assess with Gatekeeper, publish a relocatable SHA-256 checksum, and create the GitHub Release only
-  from the protected release environment.
+- Build a macOS 13 universal `arm64` and `x86_64` release executable and require a GitHub-verified
+  signed annotated tag. Publish unsigned `zip` and `tar.gz` archives with relocatable SHA-256
+  checksums from the protected release environment with no Apple signing or notarization (ADR-0004).
+  Install the primary distribution from source via `brew install VirtualGemini/tap/macos-trash-cli`
+  or `swift build -c release --product tc`; unsigned binaries may trigger Gatekeeper on first launch.
 - Rename the complete product and Swift package to `macos-trash-cli`, with `tc` as the sole
   production command and `tc-test` as the compile-time-isolated acceptance command. Rename all
   product-specific modules, symbols, safety paths, fixtures, repository policy, tracker paths, and

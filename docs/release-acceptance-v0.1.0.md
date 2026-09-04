@@ -1,6 +1,6 @@
 # v0.1.0 Release Acceptance Record
 
-Status: release candidate; publication is blocked on maintainer credentials, CODEOWNER approval, and the owned Homebrew tap step below. External-volume observations are non-blocking compatibility evidence.
+Status: release candidate; publication is blocked on a GitHub-verified signed tag, CODEOWNER approval, and the owned Homebrew tap step below. External-volume observations are non-blocking compatibility evidence. No Apple signing or notarization is required (ADR-0004).
 
 This record is the auditable evidence index for issue 11. It distinguishes repository evidence from
 actions that require a protected GitHub environment or a maintainer's Finder session. Paths and home
@@ -17,14 +17,13 @@ directories in retained logs are normalized to `REPO_ROOT`, `TEST_CONTAINER`, an
 | Same-name Finder receipts | [`duplicate-trash-name.log`](manual-testing/results/tc-test-product-identity-acceptance-20260818/duplicate-trash-name.log) | Two exact source generations; distinct system URLs |
 | Debug and Release target builds | `make build`; `make build-release`; product-identity report metadata | All package targets; no real Trash API |
 | Release architecture artifact | [`report.md`](manual-testing/results/tc-v0-1-release-architecture-20260819/report.md) | `scripts/build-universal-release.sh`; arm64+x86_64, macOS 13.0 minimum |
-| Release pipeline contract | `make test-policy` runs `Tests/PolicyTests/run-release-tests.sh` | External signing, notarization, and GitHub tools are boundary doubles |
+| Release pipeline contract | `make test-policy` runs `Tests/PolicyTests/run-release-tests.sh` | Unsigned zip+tar.gz with sha256 and GitHub tag verification are boundary doubles; no Apple signing |
 
 The release job invokes `make ci` before producing an artifact. `run-release.sh` then requires a clean
-cryptographically signed tag, a dated changelog heading, protected Developer ID and App Store Connect
-credentials, and a non-existing GitHub Release. It signs with the hardened runtime, notarizes the
-archive with `xcrun notarytool`, records the submission and log JSON, runs `spctl`, writes a relocatable
-SHA-256 file, and uploads all four evidence assets with `gh release create --verify-tag`. Any issue in
-the notarization log, including a warning, prevents publication.
+GitHub-verified signed tag, a dated changelog heading, and a non-existing GitHub Release. It builds the
+universal binary, validates `tc --version`, produces unsigned `zip` and `tar.gz` archives with relocatable
+`sha256` files, and uploads all four assets with `gh release create --verify-tag`. No `codesign`,
+`notarytool`, or `spctl` step is executed.
 
 ## Finder recovery evidence
 
@@ -51,14 +50,13 @@ final exact target immediately after completion.
 
 ## Owned release blockers
 
-1. A maintainer must populate the protected `release` environment with `APPLE_SIGNING_IDENTITY`, the
-   Developer ID Application `.p12` and password, and the App Store Connect API key/ID/issuer; no agent
-   or pull request should receive these secrets. GitHub supplies the job-scoped `GITHUB_TOKEN`.
-2. A maintainer with the release CODEOWNER must approve the workflow and run the signed `v0.1.0` tag.
-   The job fails closed when the tag is unsigned, the release already exists, or any notarization step
-   is not accepted.
-3. The maintained Homebrew tap must publish the source-build formula after the GitHub archive checksum
-   exists. A v0.1.0 bottle is intentionally not promised.
+1. The protected `release` environment needs only `GH_TOKEN` for `gh release create`. No Apple
+   Developer Program membership or `APPLE_*` secrets are required.
+2. A maintainer with the release CODEOWNER must approve the workflow and run the `v0.1.0` tag.
+   The job fails closed when the tag is not GitHub-verified or the release already exists.
+3. The maintained Homebrew tap `VirtualGemini/homebrew-tap` publishes the source-build formula;
+   `run-release.sh` auto-pushes the bump when `HOMEBREW_TAP_DIR` is configured, otherwise it prints
+   the `sha256` values for manual bump. A v0.1.0 bottle is intentionally not promised.
 4. External-volume observations remain maintainer-owned compatibility evidence and must not be rewritten
    as universal support claims.
 

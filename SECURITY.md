@@ -29,9 +29,12 @@ or user data.
 
 ## Release and recovery safety
 
-The v0.1 release artifact is intended for macOS 13 or later and must be Developer ID signed and Apple
-notarized before distribution. Release signing and notarization credentials are restricted to the
-protected GitHub `release` environment; pull requests and ordinary CI jobs never receive them.
+The v0.1 release is intended for macOS 13 or later. The primary distribution is a source build; the
+optional GitHub Release archives are unsigned and are accompanied by detached SHA-256 checksums. Apple
+Developer ID signing and notarization are not required (ADR-0004). Verify a downloaded archive against
+its published checksum before opening it; macOS Gatekeeper may require an explicit user approval for an
+unsigned binary. The protected GitHub `release` environment controls publication, and pull requests
+and ordinary CI jobs never receive its release credentials.
 
 tc moves entries to the system Trash and never permanently deletes them or empties Trash. Moving an
 entry normally does not free disk space immediately. Finder controls Put Back, and recovery can be

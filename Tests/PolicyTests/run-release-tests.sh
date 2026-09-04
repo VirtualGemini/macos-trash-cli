@@ -74,7 +74,7 @@ mkdir -p "$scratch/release"
 cat >"$scratch/release/tc" <<'BINARY'
 #!/bin/sh
 [ "$1" = --version ]
-printf '%s\n' 'tc 0.1.0'
+printf '%s\n' "tc ${TC_RELEASE_VERSION:-0.1.0}"
 BINARY
 chmod 755 "$scratch/release/tc"
 if [ "$show_bin_path" = true ]; then
@@ -105,18 +105,31 @@ case "$1" in
 esac
 EOF
 
-cat >"$fake_bin/codesign" <<'EOF'
-#!/bin/sh
-set -eu
-printf 'codesign %s\n' "$*" >>"$TC_RELEASE_TRACE"
-EOF
-
 cat >"$fake_bin/ditto" <<'EOF'
 #!/bin/sh
 set -eu
 printf 'ditto %s\n' "$*" >>"$TC_RELEASE_TRACE"
 for argument in "$@"; do output=$argument; done
 printf '%s\n' 'zip archive' >"$output"
+EOF
+
+cat >"$fake_bin/tar" <<'EOF'
+#!/bin/sh
+set -eu
+printf 'tar %s\n' "$*" >>"$TC_RELEASE_TRACE"
+archive=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "-czf" ]; then
+    archive=$arg
+    break
+  fi
+  prev=$arg
+done
+if [ -z "$archive" ]; then
+  for arg in "$@"; do archive=$arg; done
+fi
+printf '%s\n' 'tar archive' >"$archive"
 EOF
 
 cat >"$fake_bin/xcrun" <<'EOF'
@@ -127,48 +140,8 @@ case "$1 $2" in
   'vtool -show-build')
     printf '%s\n' 'Load command 0' '      minos 13.0'
     ;;
-  'notarytool submit')
-    printf '%s\n' '{"id":"11111111-2222-3333-4444-555555555555","status":"Accepted"}'
-    ;;
-  'notarytool log')
-    if [ "${TC_RELEASE_NOTARY_ISSUES:-none}" = warning ]; then
-      printf '%s\n' '{"status":"Accepted","issues":[{"severity":"warning"}]}'
-    else
-      printf '%s\n' '{"status":"Accepted","issues":null}'
-    fi
-    ;;
   *) exit 1 ;;
 esac
-EOF
-
-cat >"$fake_bin/plutil" <<'EOF'
-#!/bin/sh
-set -eu
-printf 'plutil %s\n' "$*" >>"$TC_RELEASE_TRACE"
-case "$2" in
-  id) printf '%s\n' '11111111-2222-3333-4444-555555555555' ;;
-  status) printf '%s\n' 'Accepted' ;;
-  issues)
-    case "$1" in
-      -type)
-        if [ "${TC_RELEASE_NOTARY_ISSUES:-none}" = warning ]; then
-          printf '%s\n' 'array'
-        else
-          printf '%s\n' '(any)'
-        fi
-        ;;
-      -extract) printf '%s\n' '1' ;;
-      *) exit 1 ;;
-    esac
-    ;;
-  *) exit 1 ;;
-esac
-EOF
-
-cat >"$fake_bin/spctl" <<'EOF'
-#!/bin/sh
-set -eu
-printf 'spctl %s\n' "$*" >>"$TC_RELEASE_TRACE"
 EOF
 
 cat >"$fake_bin/shasum" <<'EOF'
@@ -185,7 +158,7 @@ printf 'gh %s\n' "$*" >>"$TC_RELEASE_TRACE"
 case "$1 $2" in
   'release view') exit 1 ;;
   'release create') exit 0 ;;
-  'api repos/{owner}/{repo}/git/ref/tags/v0.1.0')
+  'api repos/{owner}/{repo}/git/ref/tags/'*)
     printf '%s\n' 'tag-object-sha'
     ;;
   'api repos/{owner}/{repo}/git/tags/tag-object-sha')
@@ -200,23 +173,18 @@ esac
 EOF
 
 chmod 755 "$fake_bin"/*
-printf '%s\n' 'private key' >"$TEMP_DIR/AuthKey.p8"
 
 PATH="$fake_bin:$PATH" \
   TC_RELEASE_TRACE="$trace_file" \
   RELEASE_OUTPUT_DIR="$output_dir" \
-  APPLE_SIGNING_IDENTITY='Developer ID Application: Example (TEAMID)' \
-  APPLE_NOTARY_KEY_PATH="$TEMP_DIR/AuthKey.p8" \
-  APPLE_NOTARY_KEY_ID='KEYID' \
-  APPLE_NOTARY_ISSUER_ID='11111111-2222-3333-4444-555555555555' \
   GH_TOKEN='test-token' \
   "$repo/scripts/run-release.sh" v0.1.0
 
-archive="$output_dir/macos-trash-cli-v0.1.0-macos-universal.zip"
-checksum="$archive.sha256"
-submission="$output_dir/macos-trash-cli-v0.1.0-notarization.json"
-notary_log="$output_dir/macos-trash-cli-v0.1.0-notarization-log.json"
-for artifact in "$archive" "$checksum" "$submission" "$notary_log"; do
+archive_zip="$output_dir/macos-trash-cli-v0.1.0-macos-universal.zip"
+checksum_zip="$archive_zip.sha256"
+archive_tar="$output_dir/macos-trash-cli-v0.1.0-macos-universal.tar.gz"
+checksum_tar="$archive_tar.sha256"
+for artifact in "$archive_zip" "$checksum_zip" "$archive_tar" "$checksum_tar"; do
   if [ ! -f "$artifact" ]; then
     echo "test failure: release pipeline did not create $(basename "$artifact")" >&2
     exit 1
@@ -233,22 +201,40 @@ assert_trace() {
   fi
 }
 
+assert_not_trace() {
+  pattern=$1
+  description=$2
+  if grep -Fq -- "$pattern" "$trace_file"; then
+    echo "test failure: release pipeline unexpectedly $description" >&2
+    cat "$trace_file" >&2
+    exit 1
+  fi
+}
+
 assert_trace 'make ci' 'run every non-destructive release gate'
 assert_trace '--triple arm64-apple-macosx13.0' 'build the Apple Silicon slice for macOS 13'
 assert_trace '--triple x86_64-apple-macosx13.0' 'build the Intel slice for macOS 13'
 assert_trace '-verify_arch arm64 x86_64' 'validate both universal binary slices'
-assert_trace 'codesign --force --options runtime --timestamp --sign Developer ID Application: Example (TEAMID)' \
-  'apply the Developer ID hardened-runtime signature'
-assert_trace 'xcrun notarytool submit' 'submit the signed archive to Apple notarization'
-assert_trace 'spctl --assess --type execute' 'assess the notarized command with Gatekeeper'
+assert_trace 'ditto -c -k' 'create the zip archive'
+assert_trace 'tar -czf' 'create the tar.gz archive'
+assert_trace 'shasum -a 256' 'compute sha256 checksums'
+assert_not_trace 'codesign' 'invoke Apple codesign'
+assert_not_trace 'notarytool' 'invoke Apple notarytool'
+assert_not_trace 'spctl' 'invoke Gatekeeper assessment'
 assert_trace 'gh api repos/{owner}/{repo}/git/tags/tag-object-sha --jq .verification.verified' \
   'require GitHub to verify the remote annotated tag signature'
-assert_trace 'gh release create v0.1.0' 'publish the existing signed tag as a GitHub Release'
+assert_trace 'gh release create v0.1.0' 'publish the existing tag as a GitHub Release'
 assert_trace '--verify-tag' 'require the release tag to exist on GitHub'
+assert_not_trace '--prerelease' 'mark a stable release as a prerelease'
 
-if [ "$(cat "$checksum")" \
-  != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  $(basename "$archive")" ]; then
-  echo 'test failure: checksum file is not relocatable beside the release archive' >&2
+if [ "$(cat "$checksum_zip")" \
+  != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  $(basename "$archive_zip")" ]; then
+  echo 'test failure: zip checksum file is not relocatable beside the release archive' >&2
+  exit 1
+fi
+if [ "$(cat "$checksum_tar")" \
+  != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  $(basename "$archive_tar")" ]; then
+  echo 'test failure: tar.gz checksum file is not relocatable beside the release archive' >&2
   exit 1
 fi
 
@@ -258,10 +244,6 @@ if PATH="$fake_bin:$PATH" \
   TC_RELEASE_TRACE="$unverified_trace" \
   TC_RELEASE_REMOTE_VERIFIED=false \
   RELEASE_OUTPUT_DIR="$TEMP_DIR/unverified-output" \
-  APPLE_SIGNING_IDENTITY='Developer ID Application: Example (TEAMID)' \
-  APPLE_NOTARY_KEY_PATH="$TEMP_DIR/AuthKey.p8" \
-  APPLE_NOTARY_KEY_ID='KEYID' \
-  APPLE_NOTARY_ISSUER_ID='11111111-2222-3333-4444-555555555555' \
   GH_TOKEN='test-token' \
   "$repo/scripts/run-release.sh" v0.1.0 >"$TEMP_DIR/unverified-output.log" 2>"$unverified_error"; then
   echo 'test failure: release pipeline accepted a tag without GitHub signature verification' >&2
@@ -278,44 +260,112 @@ if grep -Fq 'make ci' "$unverified_trace"; then
   exit 1
 fi
 
-notary_warning_trace="$TEMP_DIR/notary-warning-trace"
-notary_warning_error="$TEMP_DIR/notary-warning-error"
-if PATH="$fake_bin:$PATH" \
-  TC_RELEASE_TRACE="$notary_warning_trace" \
-  TC_RELEASE_NOTARY_ISSUES=warning \
-  RELEASE_OUTPUT_DIR="$TEMP_DIR/notary-warning-output" \
-  APPLE_SIGNING_IDENTITY='Developer ID Application: Example (TEAMID)' \
-  APPLE_NOTARY_KEY_PATH="$TEMP_DIR/AuthKey.p8" \
-  APPLE_NOTARY_KEY_ID='KEYID' \
-  APPLE_NOTARY_ISSUER_ID='11111111-2222-3333-4444-555555555555' \
-  GH_TOKEN='test-token' \
-  "$repo/scripts/run-release.sh" v0.1.0 \
-    >"$TEMP_DIR/notary-warning-output.log" 2>"$notary_warning_error"; then
-  echo 'test failure: release pipeline accepted a notarization warning' >&2
-  exit 1
-fi
-case "$(cat "$notary_warning_error")" in
-  *'error: Apple notarization log contains issues; inspect '*) ;;
-  *)
-    echo 'test failure: notarization warning did not produce the stable diagnostic' >&2
-    cat "$notary_warning_error" >&2
-    exit 1
-    ;;
-esac
-if grep -Fq 'gh release create' "$notary_warning_trace"; then
-  echo 'test failure: notarization warning reached GitHub Release publication' >&2
-  exit 1
-fi
-
 error_file="$TEMP_DIR/invalid-tag-error"
 if PATH="$fake_bin:$PATH" TC_RELEASE_TRACE="$trace_file" \
   "$repo/scripts/run-release.sh" 0.1.0 >"$TEMP_DIR/invalid-tag-output" 2>"$error_file"; then
   echo 'test failure: release pipeline accepted a tag without the v prefix' >&2
   exit 1
 fi
-if [ "$(cat "$error_file")" != 'error: release tag must use vX.Y.Z' ]; then
+if [ "$(cat "$error_file")" != 'error: release tag must use vX.Y.Z or vX.Y.Z-beta.N' ]; then
   echo 'test failure: invalid release tag did not produce the stable diagnostic' >&2
   cat "$error_file" >&2
+  exit 1
+fi
+
+rc_error="$TEMP_DIR/rc-tag-error"
+if PATH="$fake_bin:$PATH" TC_RELEASE_TRACE="$trace_file" \
+  "$repo/scripts/run-release.sh" v0.1.0-rc.1 >"$TEMP_DIR/rc-tag-output" 2>"$rc_error"; then
+  echo 'test failure: release pipeline accepted a non-beta prerelease tag' >&2
+  exit 1
+fi
+if [ "$(cat "$rc_error")" != 'error: release tag must use vX.Y.Z or vX.Y.Z-beta.N' ]; then
+  echo 'test failure: non-beta prerelease tag did not produce the stable diagnostic' >&2
+  cat "$rc_error" >&2
+  exit 1
+fi
+
+beta_repo="$TEMP_DIR/beta-repo"
+beta_bin="$TEMP_DIR/beta-bin"
+beta_output="$TEMP_DIR/beta-output"
+beta_trace="$TEMP_DIR/beta-trace"
+beta_log="$TEMP_DIR/beta-output.log"
+mkdir -p "$beta_repo/scripts" "$beta_repo/docs/releases" "$beta_output"
+cp "$repo/scripts/run-release.sh" "$beta_repo/scripts/"
+cp "$repo/scripts/build-universal-release.sh" "$beta_repo/scripts/"
+chmod 755 "$beta_repo/scripts/run-release.sh"
+chmod 755 "$beta_repo/scripts/build-universal-release.sh"
+cat >"$beta_repo/CHANGELOG.md" <<'EOF'
+# Changelog
+
+## [0.1.0-beta.1] - 2026-09-03
+
+- First beta.
+EOF
+cat >"$beta_repo/docs/releases/v0.1.0-beta.1.md" <<'EOF'
+# macos-trash-cli v0.1.0-beta.1
+
+First beta.
+EOF
+printf '%s\n' 'license' >"$beta_repo/LICENSE"
+printf '%s\n' 'notice' >"$beta_repo/NOTICE"
+printf '%s\n' '# macos-trash-cli' >"$beta_repo/README.md"
+mkdir -p "$beta_bin"
+for tool in git make swift lipo ditto tar xcrun shasum; do
+  printf '#!/bin/sh\nset -eu\nexec "%s/%s" "$@"\n' "$fake_bin" "$tool" >"$beta_bin/$tool"
+  chmod 755 "$beta_bin/$tool"
+done
+cat >"$beta_bin/gh" <<'EOF'
+#!/bin/sh
+set -eu
+printf 'gh %s\n' "$*" >>"$TC_RELEASE_TRACE"
+case "$1 $2" in
+  'release view') exit 1 ;;
+  'release create') exit 0 ;;
+  'api repos/{owner}/{repo}/git/ref/tags/'*)
+    printf '%s\n' 'tag-object-sha'
+    ;;
+  'api repos/{owner}/{repo}/git/tags/tag-object-sha')
+    case "$*" in
+      *verification.verified*) printf '%s\n' "${TC_RELEASE_REMOTE_VERIFIED:-true}" ;;
+      *object.sha*) printf '%s\n' '0123456789abcdef' ;;
+      *) exit 1 ;;
+    esac
+    ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod 755 "$beta_bin/gh"
+# Point the beta fixture at the shared fake git root by reusing its trace contract:
+# the fake git only answers status/rev-parse/rev-list, which are tag-independent.
+PATH="$beta_bin:$PATH" \
+  TC_RELEASE_TRACE="$beta_trace" \
+  TC_RELEASE_VERSION='0.1.0-beta.1' \
+  RELEASE_OUTPUT_DIR="$beta_output" \
+  GH_TOKEN='test-token' \
+  "$beta_repo/scripts/run-release.sh" v0.1.0-beta.1 >"$beta_log" 2>&1
+beta_archive_zip="$beta_output/macos-trash-cli-v0.1.0-beta.1-macos-universal.zip"
+beta_checksum_zip="$beta_archive_zip.sha256"
+beta_archive_tar="$beta_output/macos-trash-cli-v0.1.0-beta.1-macos-universal.tar.gz"
+beta_checksum_tar="$beta_archive_tar.sha256"
+for artifact in "$beta_archive_zip" "$beta_checksum_zip" "$beta_archive_tar" "$beta_checksum_tar"; do
+  if [ ! -f "$artifact" ]; then
+    echo "test failure: beta pipeline did not create $(basename "$artifact")" >&2
+    exit 1
+  fi
+done
+if ! grep -Fq -- 'gh release create v0.1.0-beta.1' "$beta_trace"; then
+  echo 'test failure: beta pipeline did not publish the beta tag' >&2
+  cat "$beta_trace" >&2
+  exit 1
+fi
+if ! grep -Fq -- '--prerelease' "$beta_trace"; then
+  echo 'test failure: beta pipeline did not mark the GitHub Release as a prerelease' >&2
+  cat "$beta_trace" >&2
+  exit 1
+fi
+if ! grep -Fq -- 'skipping tap bump for prerelease v0.1.0-beta.1' "$beta_log"; then
+  echo 'test failure: beta pipeline did not skip the Homebrew Tap bump' >&2
+  cat "$beta_log" >&2
   exit 1
 fi
 

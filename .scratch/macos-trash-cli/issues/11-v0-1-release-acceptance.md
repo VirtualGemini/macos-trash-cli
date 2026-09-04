@@ -4,7 +4,7 @@
 
 **Blocked by:** 04 — Provide the complete compatible command-line interface; 06 — Encapsulate the whitelisted system Trash capability; 07 — Move one Trash Input safely through the system Trash; 08 — Execute deterministic confirmation policy; 09 — Process an ordered batch Trash Operation; 10 — Emit stable JSON Trash Operation results.
 
-**Status:** ready-for-human
+**Status:** resolved
 
 - [x] Automated acceptance demonstrates that every successful move passes through the system Trash API and that no production or test path provides permanent-delete fallback or direct Trash-directory manipulation.
 - [x] The compatibility, Protected Path, root, symlink, dry-run, batch, JSON, test-envelope, identity-change, mount, volume, and File Provider rejection matrices pass with rejected cases proving zero Trash calls.
@@ -25,18 +25,30 @@
 - `make build-release-universal` passed with a real Mach-O universal `tc` containing `x86_64` and `arm64`;
   both slices report `minos 13.0`, and `tc --version` reports `tc 0.1.0`. Evidence:
   `docs/manual-testing/results/tc-v0-1-release-architecture-20260819/report.md`.
-- The release pipeline is implemented and tested at the public shell boundary with doubles for signing,
-  notarization, Gatekeeper, GitHub tag verification, GitHub Release, and checksum tools. It fails closed
-  before `make ci` for an unverified tag. Real credentials remain restricted to the protected `release`
-  environment and no release API was called in this implementation.
+- The release pipeline is implemented and tested at the public shell boundary with doubles for
+  universal binary, GitHub tag verification, GitHub Release, and checksum tools. It fails closed
+  before `make ci` for an unverified tag. No Apple signing/notarization is required per ADR-0004.
 - Existing 2026-08-18 Finder evidence covers local-volume Put Back, ordered batch, duplicate Trash names,
   and the production symbolic-link Finalizer. External, network, and File Provider rows remain
   compatibility observations owned by the maintainer.
-- Remaining human actions are recorded in `docs/release-acceptance-v0.1.0.md`: protected credential
-  setup/CODEOWNER approval, signed-tag release execution, and publication of the source-build Homebrew
-  formula after the signed archive checksum exists.
+- Remaining human actions were recorded in `docs/release-acceptance-v0.1.0.md` and have been updated
+  for the unsigned source distribution (ADR-0004).
 - Standards review: the staged diff was reviewed against repository standards; three findings were
   corrected before this acceptance was marked complete. Spec review: the 10 acceptance rows and PRD
   sections 17.3-17.5, 19, 21, 23, and 24 were independently traced; no missing or out-of-scope
   implementation remains. The delegated Spec review agent was unavailable due to a service parameter
   error, so this result is the primary-agent review evidence.
+
+## Decisions — 2026-08-24 (grill-with-docs)
+
+Permanent distribution decision (ADR-0004): the project will never require Apple Developer Program
+membership, Developer ID signing, or notarization. The v0.1.0 release acceptance above is retained as
+historical evidence. The actual v0.1.0 publication now follows:
+
+- Source Distribution (primary) + Unsigned Binary Archives (`zip` + `tar.gz` with `sha256`) on GitHub Releases
+- Homebrew Tap source build in `VirtualGemini/homebrew-tap` (`brew install VirtualGemini/tap/macos-trash-cli`)
+- `Package.swift` no longer declares a SwiftLint package dependency; `scripts/run-swiftlint.sh` prefers a `brew`-installed `swiftlint`
+- `scripts/run-release.sh` no longer requires `APPLE_*` or invokes `codesign`/`notarytool`/`spctl`; it uploads both archives and optionally auto-pushes the Tap bump when `HOMEBREW_TAP_DIR` is set
+- Git tag `verification.verified` remains required
+
+Follow-up work is tracked in issue 14.

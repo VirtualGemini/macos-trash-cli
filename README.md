@@ -101,14 +101,31 @@ items. `-W` remains explicitly unsupported.
 ## Installation and release
 
 The v0.1.0 release workflow builds one macOS 13+ universal executable containing both Apple Silicon
-(`arm64`) and Intel (`x86_64`) slices. The executable is signed with Developer ID, its ZIP archive is
-notarized by Apple, and the archive is published with a SHA-256 checksum on GitHub Releases. The
-archive includes `tc`, the license, notice, README, and version files; it never replaces `/bin/rm` or
-edits shell startup files.
+(`arm64`) and Intel (`x86_64`) slices and publishes **unsigned** archives to GitHub Releases:
+`macos-trash-cli-vX.Y.Z-macos-universal.zip` and `macos-trash-cli-vX.Y.Z-macos-universal.tar.gz`,
+each with a detached `sha256` file. Archives include `tc`, the license, notice, README, and version
+files; they never replace `/bin/rm` or edit shell startup files. Unsigned binaries may trigger
+Gatekeeper on first launch — allow them in System Settings → Privacy & Security → Still Open if you
+trust the checksum and release notes.
 
-The initial Homebrew strategy is a source-build formula in the project's maintained tap. A bottle is
-not promised for v0.1.0: the tap formula will be published only after the signed GitHub archive and
-checksum exist. Until that tap is published, build the tagged source with Swift Package Manager:
+The primary installation method is a Homebrew source-build formula in the maintained tap
+`VirtualGemini/homebrew-tap` (see ADR-0004). No Apple signing or notarization is required:
+
+```sh
+brew install VirtualGemini/tap/macos-trash-cli
+```
+
+Or install from a GitHub Release asset:
+
+```sh
+curl -LO https://github.com/VirtualGemini/macos-trash-cli/releases/download/v0.1.0/macos-trash-cli-v0.1.0-macos-universal.zip
+shasum -a 256 macos-trash-cli-v0.1.0-macos-universal.zip
+# compare with the published .sha256
+unzip macos-trash-cli-v0.1.0-macos-universal.zip
+install -m 755 macos-trash-cli-v0.1.0-macos-universal/tc "$HOME/.local/bin/tc"
+```
+
+Until the tap is available, build the tagged source with Swift Package Manager:
 
 ```sh
 git clone https://github.com/VirtualGemini/macos-trash-cli.git
@@ -119,8 +136,8 @@ BIN_DIR=$(swift build -c release --product tc --show-bin-path)
 install -m 755 "$BIN_DIR/tc" "$HOME/.local/bin/tc"
 ```
 
-The source-build path produces a local executable and does not claim the signed, notarized release
-artifact. Check the release notes and checksum before distributing a downloaded archive.
+The source-build path produces a local executable. Check the release notes and published checksum
+before distributing a downloaded archive.
 
 ## Project status
 
