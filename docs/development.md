@@ -552,6 +552,9 @@ automatically.
 - pure unit tests;
 - no real Trash integration.
 
+The pre-push hook runs these checks directly and does not require a SwiftPM SwiftLint checkout;
+SwiftLint is provided by the Homebrew-based wrapper described above.
+
 CI repeats all enforceable checks. Local hooks are convenience and may never be the only gate.
 The documentation-impact checker is a POSIX shell command and uses macOS `plutil` to read the
 JSON-compatible `.docs-impact.yml`; hooks do not compile helper programs on demand.

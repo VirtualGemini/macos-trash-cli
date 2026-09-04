@@ -48,4 +48,9 @@ for workflow in ci.yml release.yml; do
   fi
 done
 
+if grep -Fq '.build/checkouts/SwiftLint' "$ROOT/.githooks/pre-push"; then
+  echo 'test failure: pre-push must not require the removed SwiftPM SwiftLint checkout' >&2
+  exit 1
+fi
+
 echo "Tool version tests passed."
