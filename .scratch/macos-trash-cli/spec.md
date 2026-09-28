@@ -4,6 +4,8 @@ Status: Draft
 
 Target release: v0.1.0
 
+Current prerelease candidate: v0.1.0-beta.1
+
 Platform: macOS 13 及以上
 
 License: Apache-2.0
@@ -217,7 +219,8 @@ tc [OPTIONS] <PATH>...
 | `--version` | 显示版本信息 |
 | `--` | 结束选项解析 |
 
-v0.1.0 的版本输出固定为 `tc 0.1.0`。帮助与版本命令在进入路径检查或系统废纸篓能力前完成。
+版本输出必须与发布标签去掉 `v` 后的版本一致；当前预发布版本固定为 `tc 0.1.0-beta.1`，
+正式 v0.1.0 发布时为 `tc 0.1.0`。帮助与版本命令在进入路径检查或系统废纸篓能力前完成。
 生产入口必须先完成纯参数解析和全局冲突验证；只有路径操作才可以随后构造平台文件系统适配器。
 兼容参数产生的警告属于 CLI 诊断，不得进入原生 Trash Operation 请求或 Trash Plan。
 
@@ -896,6 +899,8 @@ Context 内创建自己的文件、空目录、深层目录、特殊字符文件
 ## 19. 发布与分发
 
 - 使用 Swift Package Manager 构建。
+- 首次预发布使用 `v0.1.0-beta.1`，在 GitHub 标记为 prerelease；beta 通过标签源码或二进制压缩包
+  安装，不更新仅跟踪正式版本的 Homebrew tap。
 - 最低支持 macOS 13；发布候选必须同时通过 Apple Silicon `arm64` 与 Intel `x86_64` slice 的
   Release 构建，并在合并 universal binary 后再次验证两个架构和 `minos 13.0`。
 - 提供 Apple Silicon 和 Intel 架构支持；发布形式可为 universal binary 或分别构建。

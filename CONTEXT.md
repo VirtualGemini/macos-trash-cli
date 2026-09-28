@@ -115,7 +115,8 @@ _Avoid_: Secure removal, space reclamation
 ## Distribution Language
 
 **Source Distribution**:
-The primary v0.1.0 distribution form where the Swift source archive for a Git-verified tag is built locally.
+The primary distribution form where the Swift source archive for a Git-verified tag is built locally.
+Numbered beta candidates, including v0.1.0-beta.1, use the same source-build path before the stable release.
 _Avoid_: Signed distribution, notarized artifact
 
 **Unsigned Binary Archive**:
@@ -125,6 +126,7 @@ _Avoid_: Signed binary, notarized installer
 
 **Homebrew Tap Source Build**:
 The Homebrew distribution that builds `tc` from the Source Distribution in `VirtualGemini/homebrew-tap`.
+The tap tracks stable releases only; beta candidates are installed from tagged source or GitHub archives.
 _Avoid_: Homebrew bottle, Homebrew cask
 
 ## Testing Language

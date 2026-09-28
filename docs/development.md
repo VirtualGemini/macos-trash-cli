@@ -829,13 +829,20 @@ or calling the real Trash API.
 
 ### 15.3 Using `release.yml`
 
-Day-to-day development does not run this workflow. To publish a release after all gates pass:
+Day-to-day development does not run this workflow. Publication requires all release gates to pass.
+
+The current candidate is `v0.1.0-beta.1`. Its `tc --version` output is `tc 0.1.0-beta.1`,
+covered by the pure information-command test. Before creating a tag, commit and merge the matching
+version, dated `CHANGELOG.md` entry, and `docs/releases/<tag>.md`; the release script rejects any
+mismatch. The existing release policy test covers beta archives, `--prerelease`, and skipping the
+Homebrew tap. To publish this beta from the reviewed main-branch commit:
 
 ```sh
 git switch main
 git pull --ff-only
-git tag -s v0.1.0 -m "Release v0.1.0"
-git push origin v0.1.0
+git tag -s v0.1.0-beta.1 -m "Release v0.1.0-beta.1"
+git tag -v v0.1.0-beta.1
+git push origin v0.1.0-beta.1
 ```
 
 The GitHub-verified signed `vX.Y.Z` or `vX.Y.Z-beta.N` tag starts `release.yml`. The workflow

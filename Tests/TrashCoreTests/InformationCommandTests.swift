@@ -69,7 +69,7 @@ func informationCommandsBypassFilesystemCapabilities() {
   #expect(help.standardError.isEmpty)
   #expect(help.standardOutput.contains("tc [OPTIONS] <PATH>..."))
   #expect(help.standardOutput.hasSuffix("\n"))
-  #expect(version == .init(standardOutput: "tc 0.1.0\n", standardError: "", exitCode: 0))
+  #expect(version == .init(standardOutput: "tc 0.1.0-beta.1\n", standardError: "", exitCode: 0))
   #expect(fileSystem.inspectionCount == 0)
 }
 

@@ -88,7 +88,7 @@ including `-P`, before filesystem inspection, confirmation, or Trash capability 
 
 `tc --help` prints concise native help, while `tc --help -a` groups compatibility behavior into
 accepted-with-no-effect, accepted-with-warning, and unsupported sections. `-zh` selects Chinese for
-either help surface. `tc --version` prints `tc 0.1.0`. These information commands require no Trash
+either help surface. `tc --version` prints `tc 0.1.0-beta.1`. These information commands require no Trash
 Input, do not construct the platform filesystem adapter, and do not inspect filesystem or Trash
 capabilities.
 

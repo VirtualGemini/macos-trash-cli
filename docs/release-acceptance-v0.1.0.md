@@ -1,6 +1,13 @@
 # v0.1.0 Release Acceptance Record
 
-Status: release candidate; publication is blocked on a GitHub-verified signed tag, CODEOWNER approval, and the owned Homebrew tap step below. External-volume observations are non-blocking compatibility evidence. No Apple signing or notarization is required (ADR-0004).
+Stable v0.1.0 status: release candidate; stable publication is blocked on a GitHub-verified signed tag, CODEOWNER approval, and the owned Homebrew tap step below. External-volume observations are non-blocking compatibility evidence. No Apple signing or notarization is required (ADR-0004).
+
+The first publication candidate is now `v0.1.0-beta.1`, tracked in
+[issue 15](../.scratch/macos-trash-cli/issues/15-prepare-v0-1-0-beta-1.md).
+The dated results below remain historical v0.1 acceptance evidence. The beta uses its own matching
+CLI version, changelog entry, and [release notes](releases/v0.1.0-beta.1.md), and must pass current
+automated gates before publication. The Homebrew formula is a stable-release owner action;
+beta publication skips the tap. GitHub tag verification and the protected release workflow still apply.
 
 This record is the auditable evidence index for issue 11. It distinguishes repository evidence from
 actions that require a protected GitHub environment or a maintainer's Finder session. Paths and home

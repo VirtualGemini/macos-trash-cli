@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 enum InformationRenderer {
-  static let version = "tc 0.1.0\n"
+  static let version = "tc 0.1.0-beta.1\n"
 
   static func render(_ page: HelpPage) -> String {
     let content =

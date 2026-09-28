@@ -100,39 +100,43 @@ items. `-W` remains explicitly unsupported.
 
 ## Installation and release
 
-The v0.1.0 release workflow builds one macOS 13+ universal executable containing both Apple Silicon
-(`arm64`) and Intel (`x86_64`) slices and publishes **unsigned** archives to GitHub Releases:
+The current candidate is **v0.1.0-beta.1**. Its
+[release notes](docs/releases/v0.1.0-beta.1.md) describe the prerelease and its limitations.
+Stable v0.1.0 has not been published. The release workflow builds one macOS 13+ universal executable
+containing both Apple Silicon (`arm64`) and Intel (`x86_64`) slices and publishes **unsigned** archives
+to GitHub Releases:
 `macos-trash-cli-vX.Y.Z-macos-universal.zip` and `macos-trash-cli-vX.Y.Z-macos-universal.tar.gz`,
 each with a detached `sha256` file. Archives include `tc`, the license, notice, README, and version
 files; they never replace `/bin/rm` or edit shell startup files. Unsigned binaries may trigger
 Gatekeeper on first launch — allow them in System Settings → Privacy & Security → Still Open if you
 trust the checksum and release notes.
 
-The primary installation method is a Homebrew source-build formula in the maintained tap
-`VirtualGemini/homebrew-tap` (see ADR-0004). No Apple signing or notarization is required:
+The beta is installed from tagged source or its GitHub prerelease archives once published.
+The planned Homebrew source-build formula in `VirtualGemini/homebrew-tap` tracks stable releases
+only (see ADR-0004); beta publication does not update the tap. No Apple signing or notarization is
+required.
+
+Install the beta from a GitHub Release asset:
 
 ```sh
-brew install VirtualGemini/tap/macos-trash-cli
+curl -fLO https://github.com/VirtualGemini/macos-trash-cli/releases/download/v0.1.0-beta.1/macos-trash-cli-v0.1.0-beta.1-macos-universal.zip
+curl -fLO https://github.com/VirtualGemini/macos-trash-cli/releases/download/v0.1.0-beta.1/macos-trash-cli-v0.1.0-beta.1-macos-universal.zip.sha256
+shasum -a 256 -c macos-trash-cli-v0.1.0-beta.1-macos-universal.zip.sha256
+# Continue only if checksum verification reports OK.
+unzip macos-trash-cli-v0.1.0-beta.1-macos-universal.zip
+mkdir -p "$HOME/.local/bin"
+install -m 755 macos-trash-cli-v0.1.0-beta.1-macos-universal/tc "$HOME/.local/bin/tc"
 ```
 
-Or install from a GitHub Release asset:
-
-```sh
-curl -LO https://github.com/VirtualGemini/macos-trash-cli/releases/download/v0.1.0/macos-trash-cli-v0.1.0-macos-universal.zip
-shasum -a 256 macos-trash-cli-v0.1.0-macos-universal.zip
-# compare with the published .sha256
-unzip macos-trash-cli-v0.1.0-macos-universal.zip
-install -m 755 macos-trash-cli-v0.1.0-macos-universal/tc "$HOME/.local/bin/tc"
-```
-
-Until the tap is available, build the tagged source with Swift Package Manager:
+Or build the tagged beta source with Swift Package Manager:
 
 ```sh
 git clone https://github.com/VirtualGemini/macos-trash-cli.git
 cd macos-trash-cli
-git checkout v0.1.0
+git checkout v0.1.0-beta.1
 swift build -c release --product tc
 BIN_DIR=$(swift build -c release --product tc --show-bin-path)
+mkdir -p "$HOME/.local/bin"
 install -m 755 "$BIN_DIR/tc" "$HOME/.local/bin/tc"
 ```
 

@@ -6,12 +6,17 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
-No user-facing changes are recorded after the v0.1.0 release candidate.
+No changes are recorded after the v0.1.0-beta.1 candidate.
 
-## [0.1.0] - 2026-08-19
+## [0.1.0-beta.1] - 2026-09-28
+
+This first prerelease carries the v0.1 feature set below. Stable v0.1.0 has not been published.
 
 ### Changed
 
+- Report `tc 0.1.0-beta.1` from `--version` and publish the numbered beta through GitHub's
+  prerelease channel. Beta installation uses tagged source or unsigned universal archives;
+  the Homebrew tap remains reserved for stable releases.
 - Align primary help, Compatibility Option help, README, security guidance, and release notes on
   Trash-only semantics: moving an item does not immediately free disk space, Finder controls recovery,
   Put Back is not universally guaranteed, no option enables permanent deletion, and `-r`/`-R`/`-d`/`-x`,
