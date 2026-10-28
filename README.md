@@ -1,169 +1,148 @@
 # macos-trash-cli
 
-`macos-trash-cli` is a macOS command-line tool. The core command is `tc`.
-It will move files and directories to the system Trash instead of permanently deleting them.
+English | [简体中文](README.zh-CN.md)
 
-Moving an item to Trash does not immediately free disk space. Finder controls recovery, and Put Back
-is not guaranteed for every volume or failure. tc never provides a permanent-delete or empty-Trash
-fallback.
-
-The current operational slice supports safe Trash Plan previews, deterministic confirmation, and
-approved top-level Trash moves through the complete v0.1-compatible command-line parser:
+Use it like `rm`, with files going to macOS Trash. The command is `tc`:
 
 ```sh
-tc -Rfv --dry-run report.txt build
-tc --dry-run -- -leading-hyphen
-tc report.txt
-tc --confirm=once build report.txt
-tc --json --non-interactive --confirm=never report.txt build
+tc report.txt build/
 ```
 
-Dry-run mode inspects only the supplied top-level entries, reports each entry kind in input order,
-and never moves or deletes anything. Filesystem root, the current working directory, and the current
-user's home directory are Protected Paths; explicit parent-directory expressions such as `..` are
-also rejected. Safety rejections return exit code 1.
+`tc` moves files and directories instead of permanently deleting them. Find accidentally removed
+items in Finder’s Trash while they remain there. Moving items to Trash does not immediately free disk space.
 
-The parser accepts native confirmation, missing-path, output, automation, and batch-control options.
-Familiar `-r`, `-R`, `-d`, and `-x` Compatibility Options are accepted with no effect because
-directories are moved as top-level items. `-P` warns that no secure overwrite occurs, `-W` is
-rejected, and `--strict-options` rejects all no-effect Compatibility Options. Run `tc --help` for
-concise native help, `tc --help -a` for the compatibility matrix, and add `-zh` for Chinese help.
-Help and version commands complete without constructing the platform filesystem adapter or inspecting
-Trash Inputs.
+<a id="installation-and-release"></a>
 
-Trash Inputs are processed serially in command-line order. By default, a missing or failed input is
-reported and later inputs continue; `--stop-on-error` records every later input as skipped instead.
-An item that moved with a Trash Warning remains successful and does not trigger that stop.
-`--ignore-missing` keeps an absent input in the ordered result set but suppresses its diagnostic and
-does not make the operation fail. A single standard-mode success prints its escaped source and exact
-system-returned Trash destination on one line. A batch prints one aggregate summary, `--verbose`
-prints every top-level result, and `--quiet` suppresses normal output without hiding warnings or
-errors.
+## Install
 
-`--json` writes exactly one schema-version-1 document to stdout for a preview or real Trash
-Operation. It includes aggregate success and counts plus one ordered `planned`, `moved`, `failed`, or
-`skipped` item for every top-level input. Each item carries an absolute source, its inspected kind,
-the exact system-returned destination when moved, and a nullable error containing a tc stable code
-and human-readable message. Compatibility warnings and operational diagnostics remain on stderr;
-`--verbose` does not change the JSON schema, and `--quiet` conflicts with `--json`. Machine consumers
-must depend only on tc error codes, not message text or Foundation error details. JSON output can
-contain sensitive absolute paths; tc neither retains nor uploads path history.
-
-Smart confirmation moves one ordinary file or link without prompting and asks once for multiple
-top-level inputs or any directory. `never` never prompts, `once` asks once, and `each` asks before
-each input. Prompts are written to stderr; only `y` or `yes`, ignoring case and surrounding
-whitespace, approves a move. A declined, invalid, or interrupted per-input confirmation does not
-change the successful exit code; non-interactive or non-TTY confirmation that is required exits with
-code 1 and never authorizes the affected Trash call.
-
-The `-P` Compatibility Option always warns on stderr that secure overwrite is not performed,
-including with non-TTY input, `--non-interactive`, `--quiet`, or redirected output. The warning alone
-does not change a successful exit code. With `--strict-options`, `-P` is a usage error and parsing
-stops before filesystem inspection, confirmation, or Trash capability construction.
-
-All inputs are planned before confirmation, so root execution and Protected Paths still fail with
-exit code 1 before any prompt or Trash capability. Approved ordinary files and directories are
-passed to Finder in input order through a structured Apple Event. Symbolic links use Foundation
-without following their targets, plus an identity-verified finalizer that preserves Finder Put Back.
-Every success reports the system-returned exact URL. A Finder failure never falls back to Foundation,
-and no failure falls back to permanent deletion, `NSWorkspace.recycle`, or direct Trash-directory
-manipulation. Failures report `not_moved` only when the original entry identity is confirmed
-unchanged; otherwise they report `state_uncertain`.
-
-The first real Trash Operation may show a macOS Automation prompt allowing the invoking terminal or
-`tc` to control Finder. An accepted permission is normally reused for that sender-to-Finder pair.
-If permission is required, denied, reset, or used from another terminal host, `tc` fails closed with
-an actionable stable error instead of silently using a less reliable Trash API.
-
-Finder owns the private metadata behind “Put Back.” Ordinary entries therefore use Finder directly.
-Finder refuses symbolic links, so tc prepares two owned hidden symbolic-link finalizers, moves the
-user link through Foundation as the first Foundation Trash call, then performs one successful
-Foundation finalizer call and cleans up the exact identity outside Trash. Normal success leaves no
-finalizer residue. A target-before-move Trash preflight is deliberately omitted because real Finder
-checks showed that it consumes the metadata transition needed by the following user link. If every
-prepared activation fails, or an activated finalizer cannot be cleaned up, tc preserves the target
-destination and emits a stable warning without changing the successful exit code. A failed finalizer call is retried only when
-the exact helper is still verified at its source; if it moved before throwing, tc stops with
-`finalizer_state_uncertain` instead of shifting the metadata again. If the target has not moved but
-a prepared helper can no longer be safely cleaned up, tc reports `finalizer_cleanup_failed` as a
-failed Trash Result and classifies the source from its verified post-call identity. The evidence and
-release acceptance remain tracked in
-[issue 12](.scratch/macos-trash-cli/issues/12-put-back-metadata-race.md).
-
-Exit Status Compatibility changes numeric results and has one rm-compatible empty-invocation rule:
-a short `-f` that remains effective with no paths is a successful no-op. A later confirmation option
-alone does not clear force-derived ignore-missing; both force effects must be overridden to restore
-the usage error. Moved warnings remain successful and do not trigger `--stop-on-error`; `0` means
-success, `1` means an operational or safety failure, and `64` means command-line usage failure.
-With `--json`, the empty operation is represented by a complete schema-version-1 document with no
-items. `-W` remains explicitly unsupported.
-
-## Installation and release
-
-The current published beta is **v0.1.0-beta.1**. Its
-[release notes](docs/releases/v0.1.0-beta.1.md) describe the prerelease and its limitations.
-Stable v0.1.0 has not been published. The release workflow builds one macOS 13+ universal executable
-containing both Apple Silicon (`arm64`) and Intel (`x86_64`) slices and publishes **unsigned** archives
-to GitHub Releases:
-`macos-trash-cli-vX.Y.Z-macos-universal.zip` and `macos-trash-cli-vX.Y.Z-macos-universal.tar.gz`,
-each with a detached `sha256` file. Archives include `tc`, the license, notice, README, and version
-files; they never replace `/bin/rm` or edit shell startup files. Unsigned binaries may trigger
-Gatekeeper on first launch — allow them in System Settings → Privacy & Security → Still Open if you
-trust the checksum and release notes.
-
-Install the beta through the maintained Homebrew tap (Homebrew and an active Apple Swift 6+
-toolchain from Xcode or Command Line Tools are required):
+Requires macOS 13+. Homebrew builds from source and needs an active Apple Swift 6+ toolchain
+from Xcode or Command Line Tools (`xcrun swift --version`). The toolchain may require a newer macOS.
 
 ```sh
 brew install VirtualGemini/tap/macos-trash-cli-beta
 tc --version
-tc --help
 ```
 
-This formula builds the tagged source and installs `tc`; no prebuilt bottle is provided.
-Check `xcrun swift --version` before installation. Your selected Swift toolchain may require a newer
-macOS than the executable's macOS 13 minimum. The opt-in beta formula is maintained separately
-from the future stable `macos-trash-cli` formula; both install `tc` and cannot coexist.
-Beta release automation does not update the stable formula. Source builds require no Apple signing
-or notarization; the optional unsigned archives may require explicit Gatekeeper approval (ADR-0004).
+Current release: **v0.1.0-beta.1**. The beta formula installs `tc`; the stable formula is not yet available.
+The first Trash operation may ask permission for your terminal or `tc` to control Finder.
 
-Install the beta from a GitHub Release asset:
+Alternatively, download a universal Apple Silicon / Intel archive from
+[GitHub Releases](https://github.com/VirtualGemini/macos-trash-cli/releases/tag/v0.1.0-beta.1)
+and verify its accompanying SHA-256 file. These binaries are unsigned and may require Gatekeeper approval.
+
+## Features
+
+- **System Trash:** move files and whole directories; move symbolic links without following their targets.
+- **Safety checks:** reject root execution, protected paths such as `/`, your home and current directory,
+  and explicit parent-directory expressions such as `..`. Force options cannot bypass these checks.
+- **Preview:** inspect the planned operation with `--dry-run` before moving anything.
+- **Confirmation:** choose automatic, once-per-batch, per-item, or no prompts.
+- **Ordered batches:** process paths in order, continue after item failures, or stop on the first error.
+- **Scriptable output:** get JSON results with exact Trash destinations, verbose details, or quiet output.
+
+## Everyday use
+
+### Use familiar `rm` commands
+
+For zsh, make `rm` call `tc` by adding this line to `~/.zshrc`:
 
 ```sh
-curl -fLO https://github.com/VirtualGemini/macos-trash-cli/releases/download/v0.1.0-beta.1/macos-trash-cli-v0.1.0-beta.1-macos-universal.zip
-curl -fLO https://github.com/VirtualGemini/macos-trash-cli/releases/download/v0.1.0-beta.1/macos-trash-cli-v0.1.0-beta.1-macos-universal.zip.sha256
-shasum -a 256 -c macos-trash-cli-v0.1.0-beta.1-macos-universal.zip.sha256
-# Continue only if checksum verification reports OK.
-unzip macos-trash-cli-v0.1.0-beta.1-macos-universal.zip
-mkdir -p "$HOME/.local/bin"
-install -m 755 macos-trash-cli-v0.1.0-beta.1-macos-universal/tc "$HOME/.local/bin/tc"
+alias rm='tc'
 ```
 
-Or build the tagged beta source with Swift Package Manager:
+Run `source ~/.zshrc` or open a new zsh terminal. Then use familiar commands:
 
 ```sh
-git clone https://github.com/VirtualGemini/macos-trash-cli.git
-cd macos-trash-cli
-git checkout v0.1.0-beta.1
-swift build -c release --product tc
-BIN_DIR=$(swift build -c release --product tc --show-bin-path)
-mkdir -p "$HOME/.local/bin"
-install -m 755 "$BIN_DIR/tc" "$HOME/.local/bin/tc"
+rm report.txt                   # Move a file to Trash
+rm -rf build/                   # Move a directory to Trash without prompting
+rm --dry-run report.txt build/   # Preview before moving
 ```
 
-The source-build path produces a local executable. Check the release notes and published checksum
-before distributing a downloaded archive.
+This changes your shell alias, not `/bin/rm`. Only shells that load the alias use it;
+scripts and Agents may invoke `rm` directly. Supported flags and compatibility differences are listed below.
 
-Contributors running the local CI gates need Homebrew SwiftLint; the macOS CI and release workflows
-install it explicitly on clean runners.
+### Recover from an Agent’s mistaken removal
 
-## Project status
+When an Agent removes the wrong files **through `tc`**, you can find them in Trash and recover them
+while they remain there. Ask the Agent to call `tc` explicitly; a terminal alias alone does not cover
+all Agent commands. For example, add this instruction to your project’s `AGENTS.md`:
 
-- Product requirements: [`.scratch/macos-trash-cli/spec.md`](.scratch/macos-trash-cli/spec.md)
-- Development guide: [`docs/development.md`](docs/development.md)
-- Contribution guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Security policy: [`SECURITY.md`](SECURITY.md)
+```text
+Use tc instead of rm to remove files. For unattended operations, use:
+tc --json --non-interactive --confirm=never -- <paths>
+```
 
-## License
+This covers removals performed through `tc`; direct deletion APIs and file overwrites are outside its scope.
 
-Apache License 2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+### Keep Finder’s “Put Back” available
+
+Moving an item to Trash does not always preserve Finder’s “Put Back” action. We fixed reproduced
+cases involving a restored file immediately moved to Trash again, and symbolic links moved through
+system Trash APIs. The fix applies to items moved by `tc`.
+
+[Local macOS acceptance checks](docs/release-acceptance-v0.1.0.md#finder-recovery-evidence) confirm
+these recovery cases. Put Back is not guaranteed on every volume or after every failure.
+
+## Command reference
+
+```text
+Usage:
+  tc [OPTIONS] [--] <PATH>...
+  tc --help [-a] [-zh]
+  tc --version
+
+Confirmation:
+  -f, --force             Never prompt; ignore missing paths
+  -i, --interactive       Confirm each input
+  -I                      Confirm once for >3 inputs or any directory
+      --confirm=<MODE>    Choose a confirmation policy:
+                            smart  Ask once for multiple inputs or any directory (default)
+                            never  Never prompt
+                            once   Ask once for the batch
+                            each   Ask before each input
+
+Operation:
+      --dry-run           Preview without moving anything
+      --ignore-missing    Ignore missing paths without changing confirmation policy
+      --non-interactive   Fail if a confirmation prompt would be needed
+      --stop-on-error     Stop after the first item failure; skip remaining inputs
+      --strict-options    Reject no-effect compatibility options, including -P
+  --                      End option parsing (for paths beginning with a hyphen)
+
+Output:
+  -v, --verbose           Show every top-level result
+      --quiet             Suppress normal output; retain warnings and errors
+      --json              Write one JSON document to stdout; diagnostics stay on stderr
+
+Information:
+      --help              Show native help
+  -a                      With --help: show compatibility options
+  -zh                     With --help: show Chinese help
+      --version           Show the installed version
+
+rm compatibility:
+  -r, -R, -d, -x          Accepted with no effect; directories move as whole items
+  -P                      Warn that secure overwrite is not performed
+  -W                      Unsupported; returns a usage error
+
+Exit codes:
+  0  Success (including moved items with warnings)
+  1  Operational or safety failure
+  64 Invalid options or command usage
+```
+
+`--json` and `--quiet` cannot be combined. Operational short options can be grouped, such as `-iv`.
+Required confirmation needs a TTY; for scripts, use `--non-interactive --confirm=never`.
+
+## Examples
+
+```sh
+tc -i report.txt build/   # Confirm each item
+tc -- -leading-hyphen     # A filename starting with -
+tc --help -a -zh          # Chinese compatibility help
+```
+
+For detailed behavior, see the [help contract](docs/help.md). For contributing, see the
+[development guide](docs/development.md) and [contribution guide](CONTRIBUTING.md).
+
+Licensed under [Apache-2.0](LICENSE). See [NOTICE](NOTICE) and the [security policy](SECURITY.md).
