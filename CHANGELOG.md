@@ -6,7 +6,16 @@ The format is based on Keep a Changelog, and the project follows Semantic Versio
 
 ## [Unreleased]
 
-No changes are recorded after the v0.1.0-beta.1 candidate.
+### Added
+
+- Install the published beta from source with `brew install VirtualGemini/tap/macos-trash-cli-beta`.
+  The opt-in formula requires Apple Swift 6+ and is maintained independently of the future stable formula.
+
+### Fixed
+
+- Stable Homebrew updates now download and hash the exact source tarball, update its URL and optional
+  explicit version together, and preserve the formula on download or template-validation failures.
+  Binary archive checksums are never reused for source installation.
 
 ## [0.1.0-beta.1] - 2026-09-28
 

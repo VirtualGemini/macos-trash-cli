@@ -39,3 +39,10 @@
   `brew audit --strict` and `brew test` against the tagged tarball, and on a healthy toolchain
   run `make bootstrap` to regenerate the now pin-less `Package.resolved` (stale SwiftLint pins
   are still committed because the sandbox SwiftPM cannot rewrite the resolution file).
+
+## Follow-up — 2026-10-28
+
+Issue 16 adds the independent beta source formula and corrects the stable updater's source checksum.
+The stable `macos-trash-cli` formula remains pending the stable v0.1.0 release; beta installation
+must not be recorded as completion of that stable acceptance criterion. Historical dependency and
+signing blockers above were resolved before the published v0.1.0-beta.1 release (issue 15).

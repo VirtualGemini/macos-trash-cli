@@ -126,7 +126,8 @@ _Avoid_: Signed binary, notarized installer
 
 **Homebrew Tap Source Build**:
 The Homebrew distribution that builds `tc` from the Source Distribution in `VirtualGemini/homebrew-tap`.
-The tap tracks stable releases only; beta candidates are installed from tagged source or GitHub archives.
+The `macos-trash-cli` formula tracks stable releases; the opt-in `macos-trash-cli-beta` formula
+tracks reviewed beta tags separately. Both build tagged source and install the same `tc` command.
 _Avoid_: Homebrew bottle, Homebrew cask
 
 ## Testing Language

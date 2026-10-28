@@ -100,7 +100,7 @@ items. `-W` remains explicitly unsupported.
 
 ## Installation and release
 
-The current candidate is **v0.1.0-beta.1**. Its
+The current published beta is **v0.1.0-beta.1**. Its
 [release notes](docs/releases/v0.1.0-beta.1.md) describe the prerelease and its limitations.
 Stable v0.1.0 has not been published. The release workflow builds one macOS 13+ universal executable
 containing both Apple Silicon (`arm64`) and Intel (`x86_64`) slices and publishes **unsigned** archives
@@ -111,10 +111,21 @@ files; they never replace `/bin/rm` or edit shell startup files. Unsigned binari
 Gatekeeper on first launch — allow them in System Settings → Privacy & Security → Still Open if you
 trust the checksum and release notes.
 
-The beta is installed from tagged source or its GitHub prerelease archives once published.
-The planned Homebrew source-build formula in `VirtualGemini/homebrew-tap` tracks stable releases
-only (see ADR-0004); beta publication does not update the tap. No Apple signing or notarization is
-required.
+Install the beta through the maintained Homebrew tap (Homebrew and an active Apple Swift 6+
+toolchain from Xcode or Command Line Tools are required):
+
+```sh
+brew install VirtualGemini/tap/macos-trash-cli-beta
+tc --version
+tc --help
+```
+
+This formula builds the tagged source and installs `tc`; no prebuilt bottle is provided.
+Check `xcrun swift --version` before installation. Your selected Swift toolchain may require a newer
+macOS than the executable's macOS 13 minimum. The opt-in beta formula is maintained separately
+from the future stable `macos-trash-cli` formula; both install `tc` and cannot coexist.
+Beta release automation does not update the stable formula. Source builds require no Apple signing
+or notarization; the optional unsigned archives may require explicit Gatekeeper approval (ADR-0004).
 
 Install the beta from a GitHub Release asset:
 

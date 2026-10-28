@@ -13,3 +13,12 @@ The project permanently removes Apple Developer ID signing, notarization, and `s
 - `scripts/run-release.sh` no longer requires `APPLE_*`/`GH_TOKEN` beyond `GH_TOKEN`, no `codesign`/`notarytool`/`spctl`/`plutil` notarization log, and produces both archives.
 - Homebrew formula is source-build only; no bottle promised for v0.1.0. Tap is updated automatically when `HOMEBREW_TAP_DIR` is configured.
 - Documentation and `CONTEXT.md` Distribution Language reflect unsigned semantics; issue 11 is kept as historical acceptance with a decision appendix, issue 14 carries the new distribution work.
+
+## Beta channel — 2026-10-28
+
+The maintainer authorized an independent `macos-trash-cli-beta` source formula in the same tap.
+It pins a reviewed beta tag and the SHA-256 of that exact source tarball, builds only `tc`, and
+requires an active Apple Swift 6+ toolchain. It conflicts with the future stable formula because
+both install `tc`. Beta release automation continues to skip stable tap updates; beta formula
+changes are maintained and validated separately. This extends distribution without changing the
+source-first or unsigned-binary decision.

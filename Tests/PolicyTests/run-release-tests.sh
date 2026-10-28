@@ -37,6 +37,14 @@ cat >"$fake_bin/git" <<'EOF'
 #!/bin/sh
 set -eu
 printf 'git %s\n' "$*" >>"$TC_RELEASE_TRACE"
+if [ "$1" = -C ]; then
+  case "$3" in
+    push) exit "${TC_TAP_PUSH_STATUS:-0}" ;;
+    add) [ "${TC_TAP_STAGE_FAIL:-false}" = false ] || exit 1 ;;
+    commit) [ "${TC_TAP_COMMIT_FAIL:-false}" = false ] || exit 1 ;;
+  esac
+  exec "$TC_REAL_GIT" "$@"
+fi
 case "$1 $2" in
   'status --porcelain') exit 0 ;;
   'rev-parse HEAD') printf '%s\n' '0123456789abcdef'; exit 0 ;;
@@ -148,7 +156,11 @@ cat >"$fake_bin/shasum" <<'EOF'
 #!/bin/sh
 set -eu
 printf 'shasum %s\n' "$*" >>"$TC_RELEASE_TRACE"
-printf '%s  %s\n' 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' "$3"
+case "$3" in
+  */source.tar.gz) hash=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb ;;
+  *) hash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ;;
+esac
+printf '%s  %s\n' "$hash" "$3"
 EOF
 
 cat >"$fake_bin/gh" <<'EOF'
@@ -156,6 +168,7 @@ cat >"$fake_bin/gh" <<'EOF'
 set -eu
 printf 'gh %s\n' "$*" >>"$TC_RELEASE_TRACE"
 case "$1 $2" in
+  'repo view') printf '%s\n' 'VirtualGemini/macos-trash-cli'; exit 0 ;;
   'release view') exit 1 ;;
   'release create') exit 0 ;;
   'api repos/{owner}/{repo}/git/ref/tags/'*)
@@ -170,6 +183,22 @@ case "$1 $2" in
     ;;
   *) exit 1 ;;
 esac
+EOF
+
+cat >"$fake_bin/curl" <<'EOF'
+#!/bin/sh
+set -eu
+printf 'curl %s\n' "$*" >>"$TC_RELEASE_TRACE"
+[ "${TC_SOURCE_DOWNLOAD_FAIL:-false}" = false ] || exit 22
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --output ]; then
+    shift
+    printf '%s\n' 'source archive' >"$1"
+    exit 0
+  fi
+  shift
+done
+exit 1
 EOF
 
 chmod 755 "$fake_bin"/*
@@ -237,6 +266,89 @@ if [ "$(cat "$checksum_tar")" \
   echo 'test failure: tar.gz checksum file is not relocatable beside the release archive' >&2
   exit 1
 fi
+
+# Exercise the optional stable tap update with a real disposable Git repository.
+TC_REAL_GIT=$(command -v git)
+export TC_REAL_GIT
+tap="$TEMP_DIR/tap"
+"$TC_REAL_GIT" init -q "$tap"
+"$TC_REAL_GIT" -C "$tap" config user.name 'Release Test'
+"$TC_REAL_GIT" -C "$tap" config user.email 'release-test@example.invalid'
+"$TC_REAL_GIT" -C "$tap" config commit.gpgsign false
+"$TC_REAL_GIT" -C "$tap" config core.hooksPath /dev/null
+mkdir -p "$tap/Formula"
+formula="$tap/Formula/macos-trash-cli.rb"
+for scenario in success inferred-version download-failure invalid-template unquoted-hash single-quoted-version parenthesized-version staging-failure commit-failure push-failure; do
+  cat >"$formula" <<'EOF'
+class MacosTrashCli < Formula
+  url "https://github.com/VirtualGemini/macos-trash-cli/archive/refs/tags/v0.0.9.tar.gz"
+  version "0.0.9"
+  sha256 "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+end
+EOF
+  if [ "$scenario" = inferred-version ]; then
+    sed '/^  version /d' "$formula" >"$TEMP_DIR/inferred-formula"
+    mv "$TEMP_DIR/inferred-formula" "$formula"
+  fi
+  if [ "$scenario" = invalid-template ]; then
+    printf '  sha256 "duplicate"\n' >>"$formula"
+  fi
+  if [ "$scenario" = unquoted-hash ]; then
+    sed 's/sha256 "[a-f0-9]*"/sha256 old_hash/' "$formula" >"$TEMP_DIR/invalid-formula"
+    mv "$TEMP_DIR/invalid-formula" "$formula"
+  fi
+  if [ "$scenario" = single-quoted-version ]; then
+    sed "s/version \"0.0.9\"/version '0.0.9'/" "$formula" >"$TEMP_DIR/invalid-version"
+    mv "$TEMP_DIR/invalid-version" "$formula"
+  fi
+  if [ "$scenario" = parenthesized-version ]; then
+    sed 's/version "0.0.9"/version("0.0.9")/' "$formula" >"$TEMP_DIR/parenthesized-version"
+    mv "$TEMP_DIR/parenthesized-version" "$formula"
+  fi
+  "$TC_REAL_GIT" -C "$tap" add .
+  "$TC_REAL_GIT" -C "$tap" commit -qm "Fixture $scenario" --allow-empty
+  cp "$formula" "$TEMP_DIR/previous-formula"
+  download_fail=false
+  push_status=0
+  stage_fail=false
+  commit_fail=false
+  [ "$scenario" != download-failure ] || download_fail=true
+  [ "$scenario" != push-failure ] || push_status=1
+  [ "$scenario" != staging-failure ] || stage_fail=true
+  [ "$scenario" != commit-failure ] || commit_fail=true
+  PATH="$fake_bin:$PATH" TC_RELEASE_TRACE="$TEMP_DIR/$scenario-trace" \
+    TC_SOURCE_DOWNLOAD_FAIL="$download_fail" TC_TAP_PUSH_STATUS="$push_status" \
+    TC_TAP_STAGE_FAIL="$stage_fail" TC_TAP_COMMIT_FAIL="$commit_fail" \
+    HOMEBREW_TAP_DIR="$tap" RELEASE_OUTPUT_DIR="$TEMP_DIR/$scenario-output" \
+    GH_TOKEN=test-token "$repo/scripts/run-release.sh" v0.1.0 >"$TEMP_DIR/$scenario.log" 2>&1
+  case "$scenario" in
+    success|inferred-version|staging-failure|commit-failure|push-failure)
+      for expected in 'v0.1.0.tar.gz' \
+        'sha256 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"'; do
+        if ! grep -Fq "$expected" "$formula"; then
+          echo "test failure: $scenario formula does not contain $expected" >&2
+          cat "$formula" >&2
+          exit 1
+        fi
+      done
+      if [ "$scenario" != inferred-version ]; then
+        grep -Fq 'version "0.1.0"' "$formula"
+      fi
+      grep -Fq 'https://github.com/VirtualGemini/macos-trash-cli/archive/refs/tags/v0.1.0.tar.gz' \
+        "$TEMP_DIR/$scenario-trace"
+      ;;
+    *)
+      cmp "$formula" "$TEMP_DIR/previous-formula"
+      if grep -Fq "git -C $tap push" "$TEMP_DIR/$scenario-trace"; then
+        echo 'test failure: failed tap update reached push' >&2
+        exit 1
+      fi
+      ;;
+  esac
+  if [ "$scenario" != success ] && [ "$scenario" != inferred-version ]; then
+    grep -Fq 'warning:' "$TEMP_DIR/$scenario.log"
+  fi
+done
 
 unverified_trace="$TEMP_DIR/unverified-trace"
 unverified_error="$TEMP_DIR/unverified-error"
@@ -340,6 +452,7 @@ chmod 755 "$beta_bin/gh"
 PATH="$beta_bin:$PATH" \
   TC_RELEASE_TRACE="$beta_trace" \
   TC_RELEASE_VERSION='0.1.0-beta.1' \
+  HOMEBREW_TAP_DIR="$tap" \
   RELEASE_OUTPUT_DIR="$beta_output" \
   GH_TOKEN='test-token' \
   "$beta_repo/scripts/run-release.sh" v0.1.0-beta.1 >"$beta_log" 2>&1
@@ -366,6 +479,11 @@ fi
 if ! grep -Fq -- 'skipping tap bump for prerelease v0.1.0-beta.1' "$beta_log"; then
   echo 'test failure: beta pipeline did not skip the Homebrew Tap bump' >&2
   cat "$beta_log" >&2
+  exit 1
+fi
+
+if grep -Fq "git -C $tap" "$beta_trace" || grep -Fq 'curl ' "$beta_trace"; then
+  echo 'test failure: beta release touched the stable tap or downloaded formula source' >&2
   exit 1
 fi
 

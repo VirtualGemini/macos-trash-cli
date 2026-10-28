@@ -831,11 +831,12 @@ or calling the real Trash API.
 
 Day-to-day development does not run this workflow. Publication requires all release gates to pass.
 
-The current candidate is `v0.1.0-beta.1`. Its `tc --version` output is `tc 0.1.0-beta.1`,
+The published beta is `v0.1.0-beta.1` (2026-10-09). Its `tc --version` output is `tc 0.1.0-beta.1`,
 covered by the pure information-command test. Before creating a tag, commit and merge the matching
 version, dated `CHANGELOG.md` entry, and `docs/releases/<tag>.md`; the release script rejects any
 mismatch. The existing release policy test covers beta archives, `--prerelease`, and skipping the
-Homebrew tap. To publish this beta from the reviewed main-branch commit:
+stable Homebrew formula. The following is the historical command sequence for this beta;
+its existing tag must not be recreated:
 
 ```sh
 git switch main
@@ -852,9 +853,17 @@ workflow, and then waits for approval from the protected `release` environment. 
 dated changelog, runs all non-destructive gates, builds macOS 13 arm64 and x86_64 slices, validates
 `tc --version`, produces unsigned `zip` and `tar.gz` archives with `sha256` files, and publishes
 them with `gh release create --verify-tag`. Beta tags are published with the additional
-`--prerelease` flag and never touch the Homebrew tap. No Apple signing, notarization, or `spctl`
+`--prerelease` flag and never update the stable Homebrew formula. No Apple signing, notarization, or `spctl`
 is performed (ADR-0004). For stable releases, when `HOMEBREW_TAP_DIR` is configured, the script
-auto-bumps `VirtualGemini/homebrew-tap`.
+auto-bumps `VirtualGemini/homebrew-tap` by downloading the source tarball for that exact tag and
+hashing those bytes. The supported formula has one source `url`, one `sha256`, and at most one
+explicit `version`; all are updated together. Download or template-validation failures leave the
+formula unchanged and warn after the GitHub Release succeeds. Staging, commit, or push failures
+also warn without failing the published release; the updated formula remains locally for recovery
+(and a failed push may leave a local commit). The supported template uses double-quoted scalar
+fields. Policy regression tests use different source and binary hashes and exercise inferred and
+explicit versions plus download, template, staging, commit, and push failures. Binary archive
+checksums are never used for a source formula.
 
 The protected `release` environment needs only `GH_TOKEN` (provided by GitHub). No Apple Developer
 Program membership or `APPLE_*` secrets are required. Pull requests and ordinary CI jobs never receive
@@ -862,14 +871,20 @@ release credentials.
 
 The initial Homebrew decision is a source-build formula in the maintained tap
 `VirtualGemini/homebrew-tap`. v0.1.0 does not promise a prebuilt bottle; the tap formula is an owned
-post-release step after the unsigned archive checksums are available. Release evidence and remaining
+post-release step using the source tarball checksum. The opt-in beta formula
+`macos-trash-cli-beta` is maintained separately in the same tap and builds only `tc` with Apple
+Swift 6+ from Xcode or Command Line Tools. Validate changes with `brew audit --strict`, a source
+installation, and `brew test VirtualGemini/tap/macos-trash-cli-beta`; its test invokes only version
+and help, never the real Trash API. The two channels cannot be installed together because they
+both provide `tc`. Release evidence and remaining
 owner actions are recorded in [`docs/release-acceptance-v0.1.0.md`](release-acceptance-v0.1.0.md).
 
 ## 16. Versioning and changelog
 
 The project uses Semantic Versioning with signed `vX.Y.Z` tags for stable releases and
 `vX.Y.Z-beta.N` tags for prereleases. Beta releases are published as GitHub prereleases for
-pipeline and installer validation; the Homebrew tap tracks stable releases only.
+pipeline and installer validation; the stable Homebrew formula tracks stable releases only, while
+`macos-trash-cli-beta` is an explicitly selected beta source-build channel.
 
 - `fix` normally increments patch.
 - non-breaking `feat` increments minor.
