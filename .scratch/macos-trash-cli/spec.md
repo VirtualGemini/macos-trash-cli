@@ -900,7 +900,8 @@ Context 内创建自己的文件、空目录、深层目录、特殊字符文件
 
 - 使用 Swift Package Manager 构建。
 - 首次预发布使用 `v0.1.0-beta.1`，在 GitHub 标记为 prerelease；beta 通过标签源码或二进制压缩包
-  安装，不更新仅跟踪正式版本的 Homebrew tap。
+  安装，也可通过独立的 `macos-trash-cli-beta` formula 从源码安装；beta 发布自动化不更新
+  正式版 `macos-trash-cli` formula。两者都安装 `tc`，不可同时安装，源码构建要求 Apple Swift 6+。
 - 最低支持 macOS 13；发布候选必须同时通过 Apple Silicon `arm64` 与 Intel `x86_64` slice 的
   Release 构建，并在合并 universal binary 后再次验证两个架构和 `minos 13.0`。
 - 提供 Apple Silicon 和 Intel 架构支持；发布形式可为 universal binary 或分别构建。

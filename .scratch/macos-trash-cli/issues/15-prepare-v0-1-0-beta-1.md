@@ -1,6 +1,6 @@
 # 15 — Prepare v0.1.0-beta.1 publication
 
-Status: ready-for-human
+Status: resolved
 
 ## Request
 
@@ -51,7 +51,7 @@ JSON schema, unsigned distribution policy, and stable-only Homebrew publication.
   review confirmed the findings and clarified that the historical Homebrew blocker applies to
   stable v0.1.0. No unresolved implementation findings remain.
 
-## Remaining publication steps
+## Publication checklist recorded before release
 
 1. Validate the preparation commit and full branch range, then open the preparation PR.
 2. Obtain maintainer review, merge the PR, and require passing main-branch CI.
@@ -61,5 +61,15 @@ JSON schema, unsigned distribution policy, and stable-only Homebrew publication.
    tag, and approve the protected release deployment. Confirm GitHub marks the tag as verified
    and publishes a prerelease with all four archive/checksum assets.
 
-Repository preparation is validated; actual publication remains pending. The beta does not require
-the stable Homebrew formula to be published.
+The above checklist is historical. Publication completed on 2026-10-09:
+
+- PR #24 merged at `62ba5e2d0adbc3fa0c506b584bee34da824ba752`.
+- Signed tag `v0.1.0-beta.1` uses GitHub tag object `636a308147788b1db11c6d8acc2acc6707f96613`.
+- The protected release workflow [37903432330](https://github.com/VirtualGemini/macos-trash-cli/actions/runs/37903432330)
+  completed and the prerelease was published at 08:31:46 UTC.
+- Both unsigned universal archives and their SHA-256 files are present at
+  https://github.com/VirtualGemini/macos-trash-cli/releases/tag/v0.1.0-beta.1.
+- The publication session verified downloaded checksums, architectures, and `tc --version`.
+- 2026-10-28: GitHub PR, tag, and release records were rechecked. Stable v0.1.0 is unpublished.
+
+The separate beta Homebrew channel is follow-up issue 16; it was not a requirement for this release.

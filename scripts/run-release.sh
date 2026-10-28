@@ -145,12 +145,11 @@ printf 'published %s with architectures: %s\n' "$tag" "$(lipo "$universal_binary
 printf 'zip: %s  sha256 %s\n' "$archive_zip" "$archive_zip_hash"
 printf 'tar.gz: %s  sha256 %s\n' "$archive_tar" "$archive_tar_hash"
 
-# Optional Homebrew Tap bump (source-build formula). Prereleases never touch the tap;
-# the tap tracks stable releases only.
+# Optional stable Homebrew formula bump. Beta formula maintenance is independent.
 tap_dir=${HOMEBREW_TAP_DIR:-}
 tap_repo=${HOMEBREW_TAP_GITHUB_REPO:-VirtualGemini/homebrew-tap}
 if [ "$is_prerelease" = true ]; then
-  printf 'skipping tap bump for prerelease %s; tap tracks stable releases\n' "$tag" >&2
+  printf 'skipping tap bump for prerelease %s; stable formula tracks stable releases\n' "$tag" >&2
   printf '     zip sha256: %s\n' "$archive_zip_hash" >&2
   printf '     tar.gz sha256: %s\n' "$archive_tar_hash" >&2
 elif [ -n "$tap_dir" ]; then
@@ -163,18 +162,55 @@ elif [ -n "$tap_dir" ]; then
     if [ ! -f "$formula_path" ]; then
       echo "warning: formula not found at $formula_path; skipping automatic bump" >&2
     else
-      # Prefer zip sha for formula url; keep tar url commented alternative.
-      if grep -q 'sha256' "$formula_path"; then
-        # Use awk to replace first sha256 occurrence; keep file formatting stable.
-        tmp_formula=$(mktemp "${TMPDIR:-/tmp}/tc-formula.XXXXXX")
-        awk -v h="$archive_zip_hash" 'BEGIN{c=0} /sha256/ && c==0 {sub(/"[a-f0-9]{64}"/, "\"" h "\""); c=1} {print}' "$formula_path" >"$tmp_formula" && mv "$tmp_formula" "$formula_path"
+      # Match the source archive URL and hash as one validated update. Binary release
+      # assets above are different bytes and must never supply a source formula checksum.
+      update_source_formula() {
+        source_repo=$(gh repo view --json nameWithOwner --jq .nameWithOwner) || return 1
+        source_prefix="https://github.com/$source_repo/archive/refs/tags/"
+        source_url="$source_prefix$tag.tar.gz"
+        source_archive="$work_dir/source.tar.gz"
+        curl --fail --location --retry 3 --output "$source_archive" "$source_url" || return 1
+        source_hash=$(shasum -a 256 "$source_archive") || return 1
+        source_hash=${source_hash%% *}
+        printf '%s\n' "$source_hash" | grep -Eq '^[a-f0-9]{64}$' || return 1
+        # Validate the supported single-source template before replacing any bytes.
+        awk -v prefix="$source_prefix" -v url="$source_url" -v hash="$source_hash" \
+          -v version="$version" '
+          /^[[:space:]]*url([^[:alnum:]_]|$)/ {
+            urls++
+            if (index($0, "\"" prefix) == 0) invalid = 1
+            if ($0 !~ /^[[:space:]]*url "[^"]+"[[:space:]]*(#.*)?$/) invalid = 1
+            sub(/"[^"]*"/, "\"" url "\"")
+          }
+          /^[[:space:]]*sha256([^[:alnum:]_]|$)/ {
+            hashes++
+            if ($0 !~ /^[[:space:]]*sha256 "[a-f0-9]+"[[:space:]]*(#.*)?$/) invalid = 1
+            sub(/"[^"]*"/, "\"" hash "\"")
+          }
+          /^[[:space:]]*version([^[:alnum:]_]|$)/ {
+            versions++
+            if ($0 !~ /^[[:space:]]*version "[^"]+"[[:space:]]*(#.*)?$/) invalid = 1
+            sub(/"[^"]*"/, "\"" version "\"")
+          }
+          { print }
+          END { if (invalid || urls != 1 || hashes != 1 || versions > 1) exit 1 }
+        ' "$formula_path" >"$work_dir/formula.rb" || return 1
+        # Copy within the tap filesystem so the final rename is atomic.
+        tmp_formula=$(mktemp "$tap_dir/Formula/.tc-formula.XXXXXX") || return 1
+        if ! cat "$work_dir/formula.rb" >"$tmp_formula" || ! chmod 644 "$tmp_formula"; then
+          rm -f "$tmp_formula"
+          return 1
+        fi
+        mv "$tmp_formula" "$formula_path" || return 1
+      }
+      if ! update_source_formula; then
+        echo "warning: source formula update failed; tap unchanged and GitHub Release remains published" >&2
+        exit 0
       fi
-      # Update url and version if template contains them.
-      if grep -q 'url "https://github.com/.*archive/refs/tags/' "$formula_path"; then
-        tmp_formula=$(mktemp "${TMPDIR:-/tmp}/tc-formula.XXXXXX")
-        awk -v t="$tag" '{gsub(/v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz/, t ".tar.gz"); print}' "$formula_path" >"$tmp_formula" && mv "$tmp_formula" "$formula_path"
+      if ! git -C "$tap_dir" add "$formula_path"; then
+        echo "warning: tap staging failed; GitHub Release above remains published" >&2
+        exit 0
       fi
-      git -C "$tap_dir" add "$formula_path"
       if git -C "$tap_dir" diff --cached --quiet; then
         echo "tap formula already up to date; no commit needed" >&2
       elif ! git -C "$tap_dir" commit -m "macos-trash-cli $tag"; then

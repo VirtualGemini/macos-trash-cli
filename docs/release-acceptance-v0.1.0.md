@@ -2,12 +2,13 @@
 
 Stable v0.1.0 status: release candidate; stable publication is blocked on a GitHub-verified signed tag, CODEOWNER approval, and the owned Homebrew tap step below. External-volume observations are non-blocking compatibility evidence. No Apple signing or notarization is required (ADR-0004).
 
-The first publication candidate is now `v0.1.0-beta.1`, tracked in
+The first publication, `v0.1.0-beta.1`, completed on 2026-10-09 and is tracked in
 [issue 15](../.scratch/macos-trash-cli/issues/15-prepare-v0-1-0-beta-1.md).
 The dated results below remain historical v0.1 acceptance evidence. The beta uses its own matching
 CLI version, changelog entry, and [release notes](releases/v0.1.0-beta.1.md), and must pass current
 automated gates before publication. The Homebrew formula is a stable-release owner action;
-beta publication skips the tap. GitHub tag verification and the protected release workflow still apply.
+beta publication skips the stable formula. The separately maintained `macos-trash-cli-beta`
+source formula provides opt-in beta installation as of 2026-10-28. GitHub tag verification and the protected release workflow still apply.
 
 This record is the auditable evidence index for issue 11. It distinguishes repository evidence from
 actions that require a protected GitHub environment or a maintainer's Finder session. Paths and home
@@ -62,8 +63,8 @@ final exact target immediately after completion.
 2. A maintainer with the release CODEOWNER must approve the workflow and run the `v0.1.0` tag.
    The job fails closed when the tag is not GitHub-verified or the release already exists.
 3. The maintained Homebrew tap `VirtualGemini/homebrew-tap` publishes the source-build formula;
-   `run-release.sh` auto-pushes the bump when `HOMEBREW_TAP_DIR` is configured, otherwise it prints
-   the `sha256` values for manual bump. A v0.1.0 bottle is intentionally not promised.
+   `run-release.sh` auto-pushes the bump when `HOMEBREW_TAP_DIR` is configured, otherwise the formula is updated manually using the exact source tarball checksum.
+   Binary archive checksums must not be used for the source formula. A v0.1.0 bottle is intentionally not promised.
 4. External-volume observations remain maintainer-owned compatibility evidence and must not be rewritten
    as universal support claims.
 
